@@ -4,3 +4,72 @@ output: html_notebook
 ---
 
 
+```{r}
+pacman::p_install_gh("favstats/binoculaR")
+pacman::p_load(tidyverse, haven, binoculaR)
+```
+
+# Load in Data
+
+```{r}
+arab4 <- read_spss("data/arab4.sav")
+
+# arab4 <- get(load(url("https://github.com/favstats/GodlyGovernance/raw/master/data/arab4.Rdata")))
+```
+
+# Inspect Data
+
+```{r}
+binoculaR::binoculaR(arab4)
+
+save(arab4, file = "data/arab4.Rdata")
+```
+
+# Filter Data
+
+```{r}
+arab4 %<>%
+  filter(q1012 == 1) %>%#only Muslims
+  mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) %>% 
+  filter(sample != 2) #only non-refugees
+
+arab4
+```
+
+# Recode Data
+
+```{r}
+table(arab4$country)
+
+arab4 %>% 
+  mutate(cntry = sjmisc::to_label(country)) %>% 
+  mutate(region = sjmisc::to_label(a1)) %>% 
+  mutate(governorate = sjmisc::to_label(q1)) %>%
+  mutate(district = sjmisc::to_label(q2)) 
+table(arab4$cntry)
+
+arab4 %>% 
+  mutate(islamistparties = q5182) %>% 
+  mutate(islamistgov = q5184)  
+
+
+#q5182 parliamentary system based on Islamic law in which only Islamist 
+#parties compete in elections
+data$islamistparties2<-data$q518b2
+data$islamistparties2[data$islamistparties2==8]<-NA
+data$islamistparties2[data$islamistparties2==9]<-NA
+data$islamistparties2<-5-data$islamistparties2
+
+q5184
+#q5184 Islamist government without elections
+data$islamistgov<-data$q5184
+data$islamistgov[data$islamistgov==0]<-NA
+data$islamistgov[data$islamistgov==8]<-NA
+data$islamistgov[data$islamistgov==9]<-NA
+data$islamistgov<-5-data$islamistgov
+qplot(data$islamistparty)
+table(data$islamistgov)
+
+arab4$q5184
+```
+
