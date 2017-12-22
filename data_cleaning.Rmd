@@ -6,7 +6,7 @@ output: html_notebook
 
 ```{r}
 #pacman::p_install_gh("systats/binoculaR")
-pacman::p_load(tidyverse, haven, magrittr, car, psych, binoculaR)
+pacman::p_load(tidyverse, haven, magrittr, car, psych, sjPlot, sjstats, sjmisc, lme4, binoculaR)
 ```
 
 # Load in Data
@@ -25,16 +25,17 @@ arab3 <- read_spss("data/arab3.sav")
 #b_select <- binoculaR::binoculaR(arab4)
 #dput(b_select$var_codes)
 
-index <- c("country","wt" ,"sample" ,"a1", "q1", "q2", "q13", "q5182", 
-"q5184", "q6013", "q6014", "q6018", "q60118", "q605a", "q6061", "q6062", 
-"q6063", "q6064", "q6071", "q6074", "q6076", "q707", "q708", 
-"q7114", "q1001", "q1002", "q1003", "t1003", "q1004", "q1005", 
-"q609", "q6101", "q6106", "q1012", "q1012a", "q1016")
-
-arab4 %<>%
-  select(index)
-
-arab4
+#index <- c("country","wt" ,"sample" ,"a1", "q1", "q2", "q13", "q5182", 
+#"q5184", "q6013", "q6014", "q6018", "q60118", "q605a", "q6061", "q6062", 
+#"q6063", "q6064", "q6071", "q6074", "q6076", "q707", "q708", 
+#"q7114", "q1001", "q1002", "q1003", "t1003", "q1004", "q1005", 
+#"q609", "q6101", "q6106", "q1012", "q1012a", "q1016")
+#
+#arab4 %<>%
+#  select(index)
+#
+#arab4
+#view_df2(arab3, hide.progress = T)
 # save(arab4, file = "data/arab4.Rdata")
 ```
 
@@ -55,14 +56,112 @@ arab4
 
 # Recode Data
 
+## Arab3
+
+```{r}
+
+arab3 %<>% 
+  mutate(cntry = sjmisc::to_label(country)) %>% 
+  mutate(region = sjmisc::to_label(a1)) %>% 
+  mutate(governorate = sjmisc::to_label(q1)) %>% 
+  mutate(year = lubridate::year(date))
+
+  # Dependent Variable
+arab3 %<>% 
+  mutate(islamistparties1 = ifelse(q518a2 > 5, NA, 5 - q518a2)) %>%
+  mutate(islamistparties2 = ifelse(q518b2 > 5, NA, 5 - q518b2)) %>% 
+  mutate(islamistparties = case_when(
+        islamistparties1 == 1 ~ 1,
+        islamistparties1 == 2 ~ 2,
+        islamistparties1 == 3 ~ 3,
+        islamistparties1 == 4 ~ 4,
+        islamistparties2 == 1 ~ 1,
+        islamistparties2 == 2 ~ 2,
+        islamistparties2 == 3 ~ 3,
+        islamistparties2 == 4 ~ 4)
+    ) %>%  
+  mutate(islamistgov = ifelse(q5184 > 5, NA, 5 - q5184)) %>% 
+  mutate(religinterfere = ifelse(q6061 > 5, NA, q6061)) %>% 
+  mutate(religleaders = ifelse(q6062 > 5, NA, 5 - q6062)) %>% 
+  mutate(religleadersinfl = ifelse(q6063 > 5, NA, 5 - q6063)) %>%
+  mutate(seperation = ifelse(q6064 > 5, NA, q6064)) %>% 
+  mutate(religparty = Recode(q605a, "1 = 1;
+                                     2 = 1;
+                                     3 = 0;
+                                     4 = 0;
+                                     5 = 0;
+                                    8 = 0;
+                                    9 = NA")) %>% 
+  mutate(religparty2 = Recode(q605a, "1 = 5;
+                                      2 = 4;
+                                      3 = 2;
+                                      4 = 1;
+                                      5 = 3;
+                                     8 = NA;
+                                     9 = NA"))
+
+ifelse4cat_rec <- function(variable) {
+  recoded <- ifelse(variable == 0 | variable > 5, NA, 5 - variable)
+  return(recoded)
+}
+
+
+arab3 %<>% 
+  mutate(female = ifelse(sex == 2, 1, 0)) %>% 
+  mutate(work = ifelse(q1004 == 0 | q1004 > 5, NA, abs(q1004 - 2))) %>% 
+  mutate(income = ifelse4cat_rec(q1016)) %>% 
+  mutate(age = ifelse(q1001 == 0 | q1001 == 9999, NA, q1001)) %>% 
+  mutate(educ = case_when(
+        q1003 == 0 ~ NA_real_,
+        q1003 == 99 ~ NA_real_,
+        q1003 == 5 ~ 4,
+        q1003 == 6 ~ 5,
+        q1003 == 7 ~ 6,
+        q1003yem == 0 ~ NA_real_,
+        q1003yem == 99 ~ NA_real_,
+        q1003yem == 4 ~ 3,
+        q1003yem == 5 ~ 4,
+        q1003yem == 6 ~ 5,
+        q1003yem == 7 ~ 5,
+        q1003yem == 8 ~ 6,
+        q1003t == 0 ~ NA_real_,
+        q1003t == 99 ~ NA_real_,
+        q1003t == 1 ~ 1,
+        q1003t == 2 ~ 2,
+        q1003t == 3 ~ 3,
+        q1003t == 4 ~ 4,
+        q1003t == 5 ~ 5,
+        q1003t == 6 ~ 6,
+    TRUE ~ as.numeric(q1003))
+    ) %>% 
+  mutate(globalism = ifelse(q701b == 0 | q701b > 5, NA, q701b)) %>% 
+  mutate(pray = ifelse(q6101 == 0 | q6101 > 5, NA, 6 - q6101)) %>% 
+  mutate(quran = ifelse(q6106 == 0 | q6106 > 5, NA, 6 - q6106)) %>%
+  mutate(womanwork = ifelse(q6012 == 0 | q6012 > 5, NA, q6012)) %>% 
+  mutate(womenleader = ifelse4cat_rec(q6013)) %>% 
+  mutate(womeneduc = ifelse4cat_rec(q6014)) %>% 
+  mutate(nodemoc = ifelse(q6071 == 0 | q6071 > 5, NA, q6071)) %>% 
+  mutate(genderapartuni = ifelse4cat_rec(q6074)) %>% 
+  mutate(coverup = ifelse4cat_rec(q6076)) %>% 
+  select(cntry, year, region, governorate, islamistparties , islamistgov, religinterfere, religleaders, religleadersinfl, seperation, religparty, religparty2, female, work, income,  age, educ, globalism, pray, quran, womanwork, womenleader, womeneduc, nodemoc, genderapartuni, coverup)
+
+
+
+
+
+```
+
+## Arab4
+
 ```{r}
 table(arab4$country)
 
 arab4 %<>% 
   mutate(cntry = sjmisc::to_label(country)) %>% 
   mutate(region = sjmisc::to_label(a1)) %>% 
-  mutate(governorate = sjmisc::to_label(q1)) %>%
-  mutate(district = sjmisc::to_label(q2)) 
+  mutate(governorate = sjmisc::to_label(q1)) %>% 
+  mutate(year = 2016)#%>%
+#  mutate(district = sjmisc::to_label(q2)) 
 
 # Dependent Variable
 arab4 %<>% 
@@ -86,89 +185,79 @@ arab4 %<>%
                                       5 = 3;
                                      98 = NA;
                                      99 = NA"))
-  
-arab3 %<>% 
-  mutate(cntry = sjmisc::to_label(country)) %>% 
-  mutate(region = sjmisc::to_label(a1)) %>% 
-  mutate(governorate = sjmisc::to_label(q1)) 
-
-  # Dependent Variable
-arab3 %<>% 
-  mutate(islamistparties1 = ifelse(q518a2 > 5, NA, 5 - q518a2)) %>%             mutate(islamistparties2 = ifelse(q518b2 > 5, NA, 5 - q518b2)) %>% 
-  mutate(islamistgov = ifelse(q5184 > 5, NA, 5 - q5184)) %>% 
-  mutate(religinterfere = ifelse(q6061 > 5, NA, q6061)) %>% 
-  mutate(religleaders = ifelse(q6062 > 5, NA, 5 - q6062)) %>% 
-  mutate(religleadersinfl = ifelse(q6063 > 5, NA, 5 - q6063)) %>%
-  mutate(seperation = ifelse(q6064 > 5, NA, q6064)) %>% 
-  mutate(religparty = Recode(q605a, "1 = 1;
-                                     2 = 1;
-                                     3 = 0;
-                                     4 = 0;
-                                     5 = 0;
-                                    98 = 0;
-                                    99 = NA")) %>% 
-  mutate(religparty2 = Recode(q605a, "1 = 5;
-                                      2 = 4;
-                                      3 = 2;
-                                      4 = 1;
-                                      5 = 3;
-                                     98 = NA;
-                                     99 = NA"))
-
-arab3$islamistparties<-pmax(arab3$islamistparties1,arab3$islamistparties2,na.rm=T)
-
-araball <- plyr::rbind.fill(arab4,arab3)
-
-table(ss$religparty)
-table(ss$islamistgov)
-table(arab4$q6063)
-table(arab4$q605a)
-
-Q605a. 1st sentence: I prefer a religious
-political party over a non-religious p	1
-2
-3
-4
-5
-98
-99	I strongly agree with the 1st sentence
-I agree with the 1st sentence
-I agree with the 2nd sentence
-I strongly agree with the 2nd sentence
-Do not agree with either (Do not read)
-Don't know (Do not read)
-Decline to answer (Do not read)
 
 
+
+arab4 %<>% 
+  mutate(female = ifelse(q1002 == 2, 1, 0)) %>% 
+  mutate(work = ifelse(q1004 == 0 | q1004 > 5, NA, abs(q1004 - 2))) %>% 
+  mutate(income = ifelse4cat_rec(q1016)) %>% 
+  mutate(age = ifelse(q1001 == 0 | q1001 == 9999, NA, q1001)) %>% 
+  mutate(educ = case_when(
+        q1003 == 0 ~ NA_real_,
+        q1003 == 98 ~ NA_real_,
+        q1003 == 99 ~ NA_real_,
+        q1003 == 5 ~ 4,
+        q1003 == 6 ~ 5,
+        q1003 == 7 ~ 6,
+        t1003 == 0 ~ NA_real_,
+        t1003 == 98 ~ NA_real_,
+        t1003 == 99 ~ NA_real_,
+        t1003 == 3 ~ 3,
+        t1003 == 4 ~ 4,
+        t1003 == 5 ~ 5,
+        t1003 == 6 ~ 6,
+    TRUE ~ as.numeric(q1003))
+    ) %>% 
+  mutate(globalism = ifelse(q701b == 0 | q701b > 5, NA, q701b)) %>% 
+  mutate(pray = ifelse(q6101 == 0 | q6101 > 5, NA, 6 - q6101)) %>% 
+  mutate(quran = ifelse(q6106 == 0 | q6106 > 5, NA, 6 - q6106)) %>% 
+  mutate(womanwork = ifelse(q6012 == 0 | q6012 > 5, NA, q6012)) %>% 
+  mutate(womenleader = ifelse4cat_rec(q6013)) %>% 
+  mutate(womeneduc = ifelse4cat_rec(q6014)) %>% 
+  mutate(nodemoc = ifelse(q6071 == 0 | q6071 > 5, NA, q6071)) %>% 
+  mutate(genderapartuni = ifelse4cat_rec(q6074)) %>% 
+  mutate(coverup = ifelse4cat_rec(q6076)) %>% 
+  select(cntry, year, region, governorate , islamistparties , islamistgov, religinterfere, religleaders, religleadersinfl, seperation, religparty, religparty2, female, work, income,  age, educ, globalism, pray, quran, womanwork, womenleader, womeneduc, nodemoc, genderapartuni, coverup)
+
+```
+
+
+# Merging
+
+```{r}
+arab3;arab4
+
+arab <- rbind(arab4,arab3)
+
+arab
+
+table(arab$year)
+table(arab$cntry)
 ```
 
 # Factor Analysis
 
 ```{r}
-f31 <- araball %>% 
+f31 <- arab %>% 
   select(islamistparties, islamistgov, 
          religleaders, religleadersinfl) %>% 
-  fa(1, rotate="promax",   
-        fm="pa",
-        scores="regression")           
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
 fa.diagram(f31)                                  
-f31                                                    
-f31$f1$loadings                                        
-f31$f2$loadings  
+f31              
 
-predict(f31, araball %>% 
-  select(islamistparties, islamistgov, 
-         religleaders, religleadersinfl)) %>% 
-  data.frame() %>% 
-  cbind(araball) %>% 
-  ggplot(aes(PA1)) +
-  geom_histogram() +
-  facet_wrap(~cntry, scales = "free")
-
-araball %>% 
+arab %>% 
   select(islamistparties, islamistgov, 
          religleaders, religleadersinfl) %>% 
   alpha() 
+
+arab %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl) %>% 
+  KMO() 
+
 
 arab4 %>% 
   select(islamistparties, islamistgov, 
@@ -177,9 +266,138 @@ arab4 %>%
          religinterfere) %>% 
   na.omit() %>% 
   cor()  
+
+arab <- predict(f31, arab %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl)) %>% 
+  data.frame() %>% 
+  cbind(arab) %>% 
+  mutate(islamism = PA1) #%>% 
+#  ggplot(aes(islamism)) +
+#  geom_histogram() +
+#  facet_wrap(~cntry, scales = "free")
+
+#sjPlot::view_df(arab, show.frq = T, show.prc = T)
+
+```
+
+# Creating indices
+
+```{r}
+f1 <- arab %>% 
+  select(womanwork, womenleader, womeneduc) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f1)                                  
+f1        
+
+f2 <- arab %>% 
+  select(pray, quran) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f2)                                  
+f2    
+
+f3 <- arab %>% 
+  select(nodemoc, genderapartuni, coverup) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f3)                                  
+f3    
+
+arab %>% 
+  select(nodemoc, genderapartuni, coverup) %>% 
+  KMO()
+
+range01 <- function(x){(x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))}
+
+
+arab %<>% 
+  mutate(patriarchalvalues = womanwork + womenleader + womeneduc)  %>% 
+  mutate(personalpiety = pray + quran) %>% 
+#  mutate(islamism = islamism) %>% 
+  mutate(liberalislam = nodemoc + genderapartuni + coverup) %>% 
+  mutate_if(.predicate = is.double, scale) 
+
+
 ```
 
 
+# Regression
+
+```{r}
+model0 <- arab %>% 
+  lme4::lmer(islamism ~ 1 + (1|cntry/year), data = .)
+
+icc(model0)
+
+model1 <- arab %>% 
+  lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + (1|cntry/year), data = .)
+
+texreg::screenreg(model1)
+
+plot_model(model1, type = "re", sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+plot_model(model1, sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+plot_model(model1, terms = c("liberalislam", "personalpiety"), type = "pred")
+
+icc(model1)
+
+model2 <- arab %>% 
+  lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + liberalislam*personalpiety + (1|cntry/year), data = .)
+
+texreg::screenreg(model2)
+
+
+plot_model(model2, sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+
+plot_model(model2, type = "int")
+
+vif.mer <- function (fit) {
+  ## adapted from rms::vif
+  
+  v <- vcov(fit)
+  nam <- names(fixef(fit))
+  
+  ## exclude intercepts
+  ns <- sum(1 * (nam == "Intercept" | nam == "(Intercept)"))
+  if (ns > 0) {
+    v <- v[-(1:ns), -(1:ns), drop = FALSE]
+    nam <- nam[-(1:ns)]
+  }
+  
+  d <- diag(v)^0.5
+  v <- diag(solve(v/(d %o% d)))
+  names(v) <- nam
+  v
+}
+
+vif.mer(model2)
+
+```
+
+
+```{r}
+model1 <- arab %>% 
+  lme4::lmer(islamism ~ female + work + income + age + educ + globalism + pray + quran + womanwork + womenleader + womeneduc + nodemoc + genderapartuni + coverup + (1|cntry/year), data = .)
+
+texreg::screenreg(model1)
+
+plot_model(model1, sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+
+plot_model(model1, terms = c("nodemoc", "female"), type = "pred")
+
+model2 <- arab %>% 
+  lme4::lmer(islamism ~ female + work + income + age + educ + globalism + pray + quran + womanwork + womenleader + womeneduc + nodemoc + genderapartuni + coverup + nodemoc*quran + (1|cntry/year), data = .)
+
+texreg::screenreg(model2)
+```
 
 
 ```{r}
@@ -221,6 +439,59 @@ view_df2 <- function (x, weight.by = NULL, altr.row.col = TRUE, show.id = TRUE,
   cleaned <- gsub("    <", "<", cleaned, fixed = TRUE, useBytes = TRUE)
   cleaned <- gsub("  <", "<", cleaned, fixed = TRUE, useBytes = TRUE)
   return(cleaned)
+  }
+  
+  frq.value <- function(index, x, df.val, weights = NULL) {
+  valstring <- ""
+  # check if we have a valid index
+  if (index <= ncol(x) && !is.null(df.val[[index]])) {
+    # do we have weights?
+    if (!is.null(weights))
+      variab <- sjstats::weight(x[[index]], weights)
+    else
+      variab <- x[[index]]
+    # create frequency table. same function as for
+    # sjt.frq and sjp.frq
+    ftab <- create.frq.df(variab, 20)$mydat$frq
+    # remove last value, which is N for NA
+    if (length(ftab) == 1 && is.na(ftab)) {
+      valstring <- "<NA>"
+    } else {
+      for (i in 1:(length(ftab) - 1)) {
+        valstring <- paste0(valstring, ftab[i])
+        if (i < length(ftab)) valstring <- paste0(valstring, "<br>")
+      }
+    }
+  } else {
+    valstring <- ""
+  }
+  return(valstring)
+}
+
+prc.value <- function(index, x, df.val, weights = NULL) {
+  valstring <- ""
+  # check for valid indices
+  if (index <= ncol(x) && !is.null(df.val[[index]])) {
+    # do we have weights?
+    if (!is.null(weights))
+      variab <- sjstats::weight(x[[index]], weights)
+    else
+      variab <- x[[index]]
+    # create frequency table, but only get valid percentages
+    ftab <- create.frq.df(variab, 20)$mydat$valid.prc
+    # remove last value, which is a NA dummy
+    if (length(ftab) == 1 && is.na(ftab)) {
+      valstring <- "<NA>"
+    } else {
+      for (i in 1:(length(ftab) - 1)) {
+        valstring <- paste0(valstring, sprintf("%.2f", ftab[i]))
+        if (i < length(ftab)) valstring <- paste0(valstring, "<br>")
+      }
+    }
+  } else {
+    valstring <- ""
+  }
+  return(valstring)
 }
   
   encoding <- get.encoding(encoding, x)
