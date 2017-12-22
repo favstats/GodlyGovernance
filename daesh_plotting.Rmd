@@ -154,3 +154,13 @@ ggsave(ss$plot, file = "ss.png")
 sjPlot::sjp.frq(dat$daesh_resp, dat$cntry, coord.flip = T)
 ```
 
+```{r}
+sjmisc::frq(sjmisc::to_label(arab4$q709aoppose)) # oppose Israel
+```
+
+```{r}
+Q831Other. Other specified	
+
+sjmisc::frq(sjmisc::to_label(arab4$q831other))
+```
+

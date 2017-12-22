@@ -6,13 +6,14 @@ output: html_notebook
 
 ```{r}
 #pacman::p_install_gh("systats/binoculaR")
-pacman::p_load(tidyverse, haven, magrittr, binoculaR)
+pacman::p_load(tidyverse, haven, magrittr, car, psych, binoculaR)
 ```
 
 # Load in Data
 
 ```{r}
 arab4 <- read_spss("data/arab4.sav")
+arab3 <- read_spss("data/arab3.sav")
 
 # arab4 <- get(load(url("https://github.com/favstats/GodlyGovernance/raw/master/data/arab4.Rdata")))
 
@@ -45,7 +46,10 @@ arab4 %<>%
   mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) %>% 
   filter(sample != 2) #only non-refugees
 
+arab3 %<>%
+  filter(q1012 == 1) #only Muslims
 
+arab3
 arab4
 ```
 
@@ -60,13 +64,123 @@ arab4 %<>%
   mutate(governorate = sjmisc::to_label(q1)) %>%
   mutate(district = sjmisc::to_label(q2)) 
 
-arab4 %>% 
-  mutate(islamistparties = q5182) %>% 
-  mutate(islamistgov = q5184)  
+# Dependent Variable
+arab4 %<>% 
+  mutate(islamistparties = ifelse(q5182 > 5, NA, 5 - q5182)) %>% 
+  mutate(islamistgov = ifelse(q5184 > 5, NA, 5 - q5184)) %>% 
+  mutate(religinterfere = ifelse(q6061 > 5, NA, q6061)) %>% 
+  mutate(religleaders = ifelse(q6062 > 5, NA, 5 - q6062)) %>% 
+  mutate(religleadersinfl = ifelse(q6063 > 5, NA, 5 - q6063)) %>%
+  mutate(seperation = ifelse(q6064 > 5, NA, q6064)) %>% 
+  mutate(religparty = Recode(q605a, "1 = 1;
+                                     2 = 1;
+                                     3 = 0;
+                                     4 = 0;
+                                     5 = 0;
+                                    98 = 0;
+                                    99 = NA")) %>% 
+  mutate(religparty2 = Recode(q605a, "1 = 5;
+                                      2 = 4;
+                                      3 = 2;
+                                      4 = 1;
+                                      5 = 3;
+                                     98 = NA;
+                                     99 = NA"))
+  
+arab3 %<>% 
+  mutate(cntry = sjmisc::to_label(country)) %>% 
+  mutate(region = sjmisc::to_label(a1)) %>% 
+  mutate(governorate = sjmisc::to_label(q1)) 
 
+  # Dependent Variable
+arab3 %<>% 
+  mutate(islamistparties1 = ifelse(q518a2 > 5, NA, 5 - q518a2)) %>%             mutate(islamistparties2 = ifelse(q518b2 > 5, NA, 5 - q518b2)) %>% 
+  mutate(islamistgov = ifelse(q5184 > 5, NA, 5 - q5184)) %>% 
+  mutate(religinterfere = ifelse(q6061 > 5, NA, q6061)) %>% 
+  mutate(religleaders = ifelse(q6062 > 5, NA, 5 - q6062)) %>% 
+  mutate(religleadersinfl = ifelse(q6063 > 5, NA, 5 - q6063)) %>%
+  mutate(seperation = ifelse(q6064 > 5, NA, q6064)) %>% 
+  mutate(religparty = Recode(q605a, "1 = 1;
+                                     2 = 1;
+                                     3 = 0;
+                                     4 = 0;
+                                     5 = 0;
+                                    98 = 0;
+                                    99 = NA")) %>% 
+  mutate(religparty2 = Recode(q605a, "1 = 5;
+                                      2 = 4;
+                                      3 = 2;
+                                      4 = 1;
+                                      5 = 3;
+                                     98 = NA;
+                                     99 = NA"))
+
+arab3$islamistparties<-pmax(arab3$islamistparties1,arab3$islamistparties2,na.rm=T)
+
+araball <- plyr::rbind.fill(arab4,arab3)
+
+table(ss$religparty)
+table(ss$islamistgov)
+table(arab4$q6063)
+table(arab4$q605a)
+
+Q605a. 1st sentence: I prefer a religious
+political party over a non-religious p	1
+2
+3
+4
+5
+98
+99	I strongly agree with the 1st sentence
+I agree with the 1st sentence
+I agree with the 2nd sentence
+I strongly agree with the 2nd sentence
+Do not agree with either (Do not read)
+Don't know (Do not read)
+Decline to answer (Do not read)
 
 
 ```
+
+# Factor Analysis
+
+```{r}
+f31 <- araball %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl) %>% 
+  fa(1, rotate="promax",   
+        fm="pa",
+        scores="regression")           
+fa.diagram(f31)                                  
+f31                                                    
+f31$f1$loadings                                        
+f31$f2$loadings  
+
+predict(f31, araball %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl)) %>% 
+  data.frame() %>% 
+  cbind(araball) %>% 
+  ggplot(aes(PA1)) +
+  geom_histogram() +
+  facet_wrap(~cntry, scales = "free")
+
+araball %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl) %>% 
+  alpha() 
+
+arab4 %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl,
+         religparty2, seperation,
+         religinterfere) %>% 
+  na.omit() %>% 
+  cor()  
+```
+
+
+
 
 ```{r}
 view_df2 <- function (x, weight.by = NULL, altr.row.col = TRUE, show.id = TRUE, 
