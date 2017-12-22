@@ -1,74 +1,23 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Arab 4 Codebook"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
 ---
 
-
-```{r}
-#pacman::p_install_gh("systats/binoculaR")
-pacman::p_load(tidyverse, haven, magrittr, binoculaR)
-```
-
-# Load in Data
-
-```{r}
-arab4 <- read_spss("data/arab4.sav")
-
-# arab4 <- get(load(url("https://github.com/favstats/GodlyGovernance/raw/master/data/arab4.Rdata")))
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# devtools::install_github("strengejacke/sjlabelled")
+# devtools::install_github("strengejacke/sjmisc")
+# devtools::install_github("strengejacke/sjstats")
+# devtools::install_github("strengejacke/ggeffects")
+# devtools::install_github("strengejacke/sjPlot")
 
 ```
 
-# Inspect Data
-
-```{r}
-#b_select <- binoculaR::binoculaR(arab4)
-#dput(b_select$var_codes)
-
-index <- c("country","wt" ,"sample" ,"a1", "q1", "q2", "q13", "q5182", 
-"q5184", "q6013", "q6014", "q6018", "q60118", "q605a", "q6061", "q6062", 
-"q6063", "q6064", "q6071", "q6074", "q6076", "q707", "q708", 
-"q7114", "q1001", "q1002", "q1003", "t1003", "q1004", "q1005", 
-"q609", "q6101", "q6106", "q1012", "q1012a", "q1016")
-
-arab4 %<>%
-  select(index)
-
-arab4
-# save(arab4, file = "data/arab4.Rdata")
-```
-
-# Filter Data
-
-```{r}
-arab4 %<>%
-  filter(q1012 == 1) %>%#only Muslims
-  mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) %>% 
-  filter(sample != 2) #only non-refugees
-
-
-arab4
-```
-
-# Recode Data
-
-```{r}
-table(arab4$country)
-
-arab4 %<>% 
-  mutate(cntry = sjmisc::to_label(country)) %>% 
-  mutate(region = sjmisc::to_label(a1)) %>% 
-  mutate(governorate = sjmisc::to_label(q1)) %>%
-  mutate(district = sjmisc::to_label(q2)) 
-
-arab4 %>% 
-  mutate(islamistparties = q5182) %>% 
-  mutate(islamistgov = q5184)  
-
-
-
-```
-
-```{r}
+```{r, include = F}
 view_df2 <- function (x, weight.by = NULL, altr.row.col = TRUE, show.id = TRUE, 
   show.type = FALSE, show.values = TRUE, show.string.values = FALSE, 
   show.labels = TRUE, show.frq = FALSE, show.prc = FALSE, 
@@ -366,7 +315,12 @@ view_df2 <- function (x, weight.by = NULL, altr.row.col = TRUE, show.id = TRUE,
     use.viewer = use.viewer))
 }
 
-view_df2(arab4, hide.progress = T)
 ```
 
+
+```{r, results='asis'}
+arab4 <- haven::read_spss("data/arab4.sav")
+
+view_df2(arab4, hide.progress = T)
+```
 

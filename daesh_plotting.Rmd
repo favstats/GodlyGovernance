@@ -1,0 +1,156 @@
+---
+title: "Daesh Plotting"
+output: html_notebook
+---
+
+
+```{r}
+pacman::p_install_gh("systats/binoculaR")
+pacman::p_load(tidyverse, haven, binoculaR)
+```
+
+# Load in Data
+
+```{r}
+arab4 <- read_spss("data/arab4.sav")
+
+# arab4 <- get(load(url("https://github.com/favstats/GodlyGovernance/raw/master/data/arab4.Rdata")))
+
+```
+
+# Inspect Data
+
+```{r}
+#b_select <- binoculaR::binoculaR(arab4)
+#dput(b_select$var_codes)
+
+index <- c("country","wt" ,"sample" ,"a1", "q1", "q2", "q13", "q5182", 
+"q5184", "q6013", "q6014", "q6018", "q60118", "q605a", "q6061", "q6062", 
+"q6063", "q6064", "q6071", "q6074", "q6076", "q707", "q708", 
+"q7114", "q1001", "q1002", "q1003", "t1003", "q1004", "q1005", 
+"q609", "q6101", "q6106", "q1012", "q1012a", "q1016")
+
+ss <- binoculaR::binoculaR(arab4)
+
+arab4 %<>%
+  select(index)
+# save(arab4, file = "data/arab4.Rdata")
+```
+
+# Filter Data
+
+```{r}
+arab4 %<>%
+  filter(q1012 == 1) %>%#only Muslims
+  mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) %>% 
+  filter(sample != 2) #only non-refugees
+
+
+
+```
+
+# Recoding
+
+```{r}
+table(arab4$country)
+
+arab4 %<>% 
+  mutate(cntry = sjmisc::to_label(country)) %>% 
+  mutate(region = sjmisc::to_label(a1)) %>% 
+  mutate(governorate = sjmisc::to_label(q1)) %>%
+  mutate(district = sjmisc::to_label(q2)) %>% 
+  mutate(daesh_resp = factor(sjmisc::to_label(q831))) %>% 
+  mutate(daesh_resp = case_when(
+    daesh_resp == "Don't know (Do not read)" ~ "Don't know",
+    daesh_resp == "GCC country (other than Saudi Arabia)" ~ "Other Gulf country",
+    daesh_resp == "Decline to answer (Do not read)" ~ "Decline to answer",
+    TRUE ~ as.character(daesh_resp)
+  ))
+```
+
+
+
+# Plotting
+
+```{r}
+
+daesh <- arab4 %>% 
+  mutate(daesh_resp = factor(sjmisc::to_label(q831))) %>%
+  mutate(daesh_resp = forcats::fct_infreq(daesh_resp)) %>% 
+  select(cntry, daesh_resp) %>% 
+  filter(cntry != "Egypt") %>% 
+  ggplot(aes(x = daesh_resp, color = daesh_resp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = 0) +
+    labs(y = "Percent") +
+  coord_flip() +
+  ggthemes::theme_gdocs(base_size = 18) +
+  ggthemes::scale_color_fivethirtyeight() + 
+  theme(legend.position="none")
+  
+
+ggsave(daesh, file = "daesh.png", height = 10, width = 18)
+```
+
+```{r}
+plot_daesh <- function(data, cntry_fil = NULL, height = 10, width = 10) {
+
+if(!is.null(cntry_fil)) data %<>% filter(cntry == cntry_fil) 
+  
+n <- data %>% 
+  select(cntry, daesh_resp) %>% 
+  na.omit() %>% 
+  nrow()
+  
+daesh <- data %>% 
+  select(cntry, daesh_resp) %>% 
+  na.omit() %>% 
+  mutate(daesh_resp = forcats::fct_infreq(daesh_resp)) %>% 
+#  mutate(daesh_resp = forcats::fct_explicit_na(daesh_resp)) %>% 
+  ggplot(aes(x = daesh_resp, fill = daesh_resp)) + 
+          geom_bar(aes(y = (prop.table(..count..) * 100))) + 
+#          scale_y_continuous(limits = c(0, max(length(daesh_resp)) + 0.3)) +
+   geom_text(aes(y = prop.table(..count..) * 100 + 2.5, label = paste0(round(prop.table(..count..),4) * 100, '%')), 
+              colour = "black", 
+              stat = 'count', 
+              size = 9) +
+  coord_flip() +
+  ggthemes::theme_gdocs(base_size = 25) +
+  viridis::scale_fill_viridis(discrete = T) + 
+  theme(legend.position="none") +
+  ggtitle(paste0(cntry_fil, ": Who or what is responsible for Daesh?")) + 
+  labs(caption = paste0("N =\t", n, ". Data based on Arab Barometer 4 (2017)"), y = "Percent", x = NULL)
+
+  
+ggsave(daesh, file = paste0("daesh_", cntry_fil,".png"), height = height, width = width)
+
+return(daesh)
+}
+
+cntrys <- c("Algeria", "Jordan", "Lebanon", "Morocco", "Palestine", 
+"Tunisia")
+
+for (jj in cntrys) {
+  plot_daesh(arab4, jj, width = 19)
+}
+
+  plot_daesh(arab4, width = 19)
+```
+
+
+
+```{r}
+dat <- arab4 %>% 
+  mutate(daesh_resp = factor(sjmisc::to_label(q831))) %>% 
+    filter(cntry != "Egypt")
+
+
+ss <- sjPlot::sjp.grpfrq(dat$daesh_resp, dat$cntry, coord.flip = T, geom.size = 3, geom.spacing = 3, show.n = F)
+
+ggsave(ss$plot, file = "ss.png")
+
+
+sjPlot::sjp.frq(dat$daesh_resp, dat$cntry, coord.flip = T)
+```
+
