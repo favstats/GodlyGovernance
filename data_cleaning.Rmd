@@ -6,6 +6,14 @@ output: html_notebook
 
 ```{r}
 #pacman::p_install_gh("systats/binoculaR")
+#devtools::install_github("strengejacke/sjlabelled",dependencies=TRUE)
+#devtools::install_github("strengejacke/sjmisc",dependencies=TRUE)
+#devtools::install_github("strengejacke/sjstats",dependencies=TRUE)
+#devtools::install_github("strengejacke/ggeffects",dependencies=TRUE)
+#devtools::install_github("strengejacke/sjPlot",dependencies=TRUE)
+#devtools::install_github("lme4/lme4",dependencies=TRUE)
+#pacman::p_install_gh("systats/binoculaR")
+
 pacman::p_load(tidyverse, haven, magrittr, car, psych, sjPlot, sjstats, sjmisc, lme4, binoculaR)
 ```
 
@@ -315,13 +323,24 @@ arab %>%
 range01 <- function(x){(x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))}
 
 
-arab %<>% 
+arab_reg <- arab %>% 
   mutate(patriarchalvalues = womanwork + womenleader + womeneduc)  %>% 
   mutate(personalpiety = pray + quran) %>% 
-#  mutate(islamism = islamism) %>% 
+# mutate(islamism = scale(islamism)) %>% 
+#  mutate_if(.predicate = is.double, scale) 
   mutate(liberalislam = nodemoc + genderapartuni + coverup) %>% 
-  mutate_if(.predicate = is.double, scale) 
+  mutate(cntryears = paste(cntry, year))
 
+
+arab_reg$islamism <- as.numeric(range01(arab_reg$islamism) * 100)
+
+arab_reg$income             <- as.numeric(scale(arab_reg$income))
+arab_reg$age                <- as.numeric(scale(arab_reg$age))
+arab_reg$educ               <- as.numeric(scale(arab_reg$educ)) 
+arab_reg$globalism          <- as.numeric(scale(arab_reg$globalism))   
+arab_reg$personalpiety      <- as.numeric(scale(arab_reg$personalpiety))       
+arab_reg$patriarchalvalues  <- as.numeric(scale(arab_reg$patriarchalvalues))           
+arab_reg$liberalislam       <- as.numeric(scale(arab_reg$liberalislam))     
 
 ```
 
@@ -329,34 +348,38 @@ arab %<>%
 # Regression
 
 ```{r}
-model0 <- arab %>% 
+model0 <- arab_reg %>% 
   lme4::lmer(islamism ~ 1 + (1|cntry/year), data = .)
 
 icc(model0)
 
-model1 <- arab %>% 
-  lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + (1|cntry/year), data = .)
+model1 <- lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + (1|cntry/year), data = arab_reg)
 
 texreg::screenreg(model1)
 
 plot_model(model1, type = "re", sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
 
-plot_model(model1, sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+#plot_model(model1, type = "std", sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+sjp.lmer(model1, type = "fe.std", sort.est = T, show.values = T, show.p = T, y.offset = 0.4, p.kr = FALSE)
 
 plot_model(model1, terms = c("liberalislam", "personalpiety"), type = "pred")
 
 icc(model1)
 
-model2 <- arab %>% 
-  lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + liberalislam*personalpiety + (1|cntry/year), data = .)
+model2 <- lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + liberalislam*personalpiety + (1|cntry/year), data = arab_reg)
 
 texreg::screenreg(model2)
 
 
 plot_model(model2, sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
 
+sjp.int(model2, p.kr = FALSE)
 
-plot_model(model2, type = "int")
+sjp.lmer(model2, type = "fe.std", sort.est = T, show.values = T, show.p = T, y.offset = 0.4, p.kr = FALSE)
+
+
+#plot_model(model2, type = "int")
 
 vif.mer <- function (fit) {
   ## adapted from rms::vif
@@ -383,7 +406,7 @@ vif.mer(model2)
 
 
 ```{r}
-model1 <- arab %>% 
+model1 <- arab_reg %>% 
   lme4::lmer(islamism ~ female + work + income + age + educ + globalism + pray + quran + womanwork + womenleader + womeneduc + nodemoc + genderapartuni + coverup + (1|cntry/year), data = .)
 
 texreg::screenreg(model1)
@@ -393,7 +416,7 @@ plot_model(model1, sort.est = T, show.values = T, show.p = T, value.offset = 0.5
 
 plot_model(model1, terms = c("nodemoc", "female"), type = "pred")
 
-model2 <- arab %>% 
+model2 <- arab_reg %>% 
   lme4::lmer(islamism ~ female + work + income + age + educ + globalism + pray + quran + womanwork + womenleader + womeneduc + nodemoc + genderapartuni + coverup + nodemoc*quran + (1|cntry/year), data = .)
 
 texreg::screenreg(model2)
