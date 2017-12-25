@@ -28,8 +28,8 @@ arab4 <- read_spss("data/arab4.sav")
 ```{r}
 arab4 %<>%
   filter(q1012 == 1) %>%#only Muslims
-  mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) %>% 
-  filter(sample != 2) #only non-refugees
+  mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) # %>% 
+#  filter(sample != 2) #only non-refugees
 
 
 
@@ -42,6 +42,10 @@ table(arab4$country)
 
 arab4 %<>% 
   mutate(cntry = sjmisc::to_label(country)) %>% 
+  mutate(cntry = case_when(
+    sample == 2 ~ "Syrian Refugees",
+    TRUE ~ as.character(cntry)
+  )) %>% 
   mutate(region = sjmisc::to_label(a1)) %>% 
   mutate(governorate = sjmisc::to_label(q1)) %>%
   mutate(district = sjmisc::to_label(q2)) %>% 
@@ -441,28 +445,28 @@ sjmisc::frq(sjmisc::to_label(arab4$q831other))
 # sjp.likert
 
 ```{r}
-sjPlot::set_theme(theme = "539",
-             geom.label.color = "black", 
-             geom.label.size = 2.5,
-             axis.textsize = .8, 
-             axis.title.size = .9,
-             legend.size = .7,
-             legend.item.size = .5)
 
-labels <- c("Strongly agree",
-            "Agree",
-            "Disagree",
-            "Strongly Disagree",
-            "Decline/Don't Know")
+labels <- c("Strongly Disagree \t",
+            "Disagree \t",
+            "Agree \t",
+            "Strongly agree \t",
+            "Decline/Don't Know \t")
 
 plot_goal_viol <- function(data, country, labels = NULL, width = 6, height = 2, geom.size = 0.3, title = F, save = T, legend = T) {
+  
+  sjPlot::set_theme(geom.label.color = "black", 
+             geom.label.size = 3.5,
+             axis.textsize = 0.95, 
+             axis.title.size = 1,
+             legend.size = 1,
+             legend.item.size = .7)
   
   arab_wide <- data %>% 
   filter(cntry == country) %>% 
   select(daesh_goal_num, daesh_violence_num, wt)  
 
 gg <- sjp.likert(arab_wide[,1:2], 
-                 wrap.title = 20,
+#                 wrap.title = 20,
            weight.by = arab_wide$wt,
            cat.neutral = 5,
 #           sort.frq = "pos.asc",
@@ -471,24 +475,23 @@ gg <- sjp.likert(arab_wide[,1:2],
            legend.labels = labels,
            show.prc.sign = TRUE,
            show.n = FALSE,    # hide N's in axis labels
-           grid.range = 1,
+           grid.range = 1.1,
            geom.size = geom.size,
-           reverse.colors = TRUE, 
-           expand.grid = 5,
+           reverse.colors = F, 
+#           expand.grid = 5,
            axis.labels = c("Daesh's Goals","Daesh's Use of Violence"))$plot +
   labs(title = country) +
   theme_hc()
 
+
 if (title == T) {
   gg <- gg + labs(title = "To what extent do you agree with the goals
 of Daesh/ Daesh's use of violence?")
-}
+  }
 
 if (legend == F) {
   gg <- gg + theme(legend.position = "none")
-}
-
-
+  }
 
 if (save == T) {
   ggsave(gg, file = paste0("images/goal_viol_", country, ".png"), 
@@ -498,27 +501,27 @@ if (save == T) {
 return(gg)
 }
 
-cntrys <- c("Algeria", "Jordan", "Lebanon", "Morocco", "Palestine", 
-"Tunisia")
+#cntrys <- c("Algeria", "Jordan", "Lebanon", "Morocco", "Palestine", "Tunisia")
 
+#for (jj in cntrys) {
+#  plot_goal_viol(arab4, jj, save = T, width = 10, height = 5)
+#}
 
-
-for (jj in cntrys) {
-  plot_goal_viol(arab4, jj, save = T, width = 10, height = 5)
-}
-
-goal_viol_alg <- plot_goal_viol(arab4, "Algeria", save = F, legend = F, labels = labels)
+goal_viol_alg <- plot_goal_viol(arab4, "Algeria", save = T, legend = T)
 goal_viol_jor <- plot_goal_viol(arab4, "Jordan", save = F, legend = F)
 goal_viol_leb <- plot_goal_viol(arab4, "Lebanon", save = F, legend = F)
 goal_viol_mor <- plot_goal_viol(arab4, "Morocco", save = F, legend = F)
-goal_viol_pal <- plot_goal_viol(arab4, "Palestine", save = F, legend = F)
+goal_viol_pal <- plot_goal_viol(arab4, "Palestine", save = F, legend = F, labels = labels)
 goal_viol_tun <- plot_goal_viol(arab4, "Tunisia", save = F, legend = F)
+goal_viol_ref <- plot_goal_viol(arab4, "Syrian Refugees", save = F, legend = F)
 
 grid_arrange_shared_legend <- function(...,
            ncol = length(list(...)),
            nrow = 1,
            position = c("bottom", "top", "right"),
-           title) {
+           title,
+           caption,
+           n = nrow(arab4)) {
     
     plots <- list(...)
     position <- match.arg(position)
@@ -538,7 +541,10 @@ grid_arrange_shared_legend <- function(...,
         do.call(arrangeGrob, gl),
         legend,
         ncol = 1,
-        top = textGrob(title, gp = gpar(fontsize = 20)),
+        top = textGrob(title, gp = gpar(fontsize = 20)), 
+        bottom = textGrob(
+          paste0("N = \t", n, ". Data based on Arab Barometer 4 (2017)"), x = 0.99, 
+                      hjust = 1, gp = gpar(fontface = 3L, fontsize = 12)),
         heights = unit.c(unit(0.9, "npc") - lheight, lheight)
       ),
       "right" = arrangeGrob(
@@ -550,12 +556,6 @@ grid_arrange_shared_legend <- function(...,
       )
     )
     
-#    title <- textGrob("Title",gp=gpar(fontsize=50))
-    
-#    combined <- gtable_add_grob(
-#    combined, 
-#    title, 1, 1, 1, 1)
-    
     grid.newpage()
     grid.draw(combined)
     
@@ -563,96 +563,24 @@ grid_arrange_shared_legend <- function(...,
     invisible(combined)
 }
 
-combined <- grid_arrange_shared_legend( goal_viol_alg, 
-             goal_viol_jor, 
-             goal_viol_leb, 
-             goal_viol_mor, 
-             goal_viol_pal,
-             goal_viol_tun, ncol = 1, nrow = 6, 
-             position = "bottom",
-             title = "To what extent do you agree with the goals
-of Daesh/ Daesh's use of violence?") 
-
-
-ggsave(combined, file = "images/combined.png", height = 10, width = 9)
-, top = "To what extent do you agree with the goals
-of Daesh/ Daesh's use of violence?"
-
-  arab_wide <- arab4 %>% 
-#  filter(cntry == country) %>% 
-  select(daesh_goal_num, daesh_violence_num, wt, cntry)  
-
-gg <- sjp.likert(arab_wide[,1:2], 
-                 wrap.title = 500,
-           weight.by = arab_wide$wt,
-           cat.neutral = 5,
-#           sort.frq = "pos.asc",
-           values = "sum.outside",
-           geom.colors = "RdBu",
-           show.prc.sign = TRUE,
-           show.n = FALSE,    # hide N's in axis labels
-           grid.range = 1,
-           geom.size = 0.3,
-           reverse.colors = TRUE, 
-           expand.grid = 1.2,
-           axis.labels = c("Daesh's Goals","Daesh's Use of Violence"))$plot +
-  facet_wrap(~cntry)
-
-ggsave(ss, file = "data/test.png", width = 6, height = 2)
-
-legend <- get_legend(goal_viol_alg)
-
-combined <- plot_grid(legend,
+combined <- grid_arrange_shared_legend(
+  goal_viol_pal,
   goal_viol_alg, 
-             goal_viol_jor, 
-             goal_viol_leb, 
-             goal_viol_mor, 
-             goal_viol_pal,
-             goal_viol_tun, 
-           align = 'vh',
-#           labels = c("A", "B", "C"),
-#           hjust = -1,
-           ncol = 1, nrow = 7
-           )
+  goal_viol_leb,
+  goal_viol_tun,
+  goal_viol_ref,
+  goal_viol_mor,
+  goal_viol_jor,
+  ncol = 1, nrow = 7, 
+  position = "bottom",
+  title = "To what extent do you agree with 
+  the goals of Daesh/ Daesh's use of violence?") 
 
-ggsave(combined, file = "images/combined.png", height = 10, width = 6)
-cowplot::g
+ggsave(combined, file = "images/combined.png", height = 12, width = 8)
+
 ```
 
 ```{r}
-grid_arrange_shared_legend <- function(...,
-           ncol = length(list(...)),
-           nrow = 1,
-           position = c("bottom", "right")) {
-    
-    plots <- list(goal_viol_alg, 
-             goal_viol_jor)
-    position <- match.arg(position)
-    position = "bottom"
-    g <-
-      ggplotGrob(plots[[1]] + theme(legend.position = position))$grobs
-    legend <- g[[which(sapply(g, function(x)
-      x$name) == "guide-box")]]
-    lheight <- sum(legend$height)
-    lwidth <- sum(legend$width)
-    gl <- lapply(plots, function(x)
-      x + theme(legend.position = "none"))
-    gl <- c(gl, ncol = ncol, nrow = nrow)
-    
-    combined <- switch(
-      position,
-      "bottom" = arrangeGrob(
-        do.call(arrangeGrob, gl),
-        legend,
-        ncol = 1,
-        heights = unit.c(unit(1, "npc") - lheight, lheight)
-      ),
-      "right" = arrangeGrob(
-        do.call(arrangeGrob, gl),
-        legend,
-        ncol = 2,
-        widths = unit.c(unit(1, "npc") - lwidth, lwidth)
-      )
-    )
+
 ```
 
