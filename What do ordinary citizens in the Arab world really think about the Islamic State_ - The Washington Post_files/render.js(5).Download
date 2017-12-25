@@ -1,0 +1,2 @@
+(function($){try{function cleanUp(){$("li","#editors-picks-rr").each(function(i){var $this=$(this);var $headline=$(".headline",$this);var $number=$(".number",$this);var lineHeight=parseInt($headline.css("lineHeight"));if($headline.height()<=2*lineHeight)$headline.css({"padding-top":"7px","padding-bottom":"8px"});else if($headline.height()>3*lineHeight)while($headline.height()>3*lineHeight){$headline.text($headline.text().replace(/\.\.\.$/,""));$headline.text($headline.text().slice(0,-1));$headline.text($headline.text()+
+"...")}})}cleanUp()}catch(e){}})(jQuery);

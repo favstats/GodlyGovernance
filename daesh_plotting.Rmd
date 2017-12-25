@@ -3,10 +3,13 @@ title: "Daesh Plotting"
 output: html_notebook
 ---
 
+# Packages
 
 ```{r}
-pacman::p_install_gh("systats/binoculaR")
-pacman::p_load(tidyverse, haven, binoculaR)
+#pacman::p_install_gh("systats/binoculaR")
+pacman::p_load(tidyverse, haven, ggthemes, sjPlot, binoculaR, ggplot2, grid, gridExtra, gtable, cowplot)
+
+#devtools::install_github("thomasp85/patchwork")
 ```
 
 # Load in Data
@@ -18,24 +21,7 @@ arab4 <- read_spss("data/arab4.sav")
 
 ```
 
-# Inspect Data
 
-```{r}
-#b_select <- binoculaR::binoculaR(arab4)
-#dput(b_select$var_codes)
-
-index <- c("country","wt" ,"sample" ,"a1", "q1", "q2", "q13", "q5182", 
-"q5184", "q6013", "q6014", "q6018", "q60118", "q605a", "q6061", "q6062", 
-"q6063", "q6064", "q6071", "q6074", "q6076", "q707", "q708", 
-"q7114", "q1001", "q1002", "q1003", "t1003", "q1004", "q1005", 
-"q609", "q6101", "q6106", "q1012", "q1012a", "q1016")
-
-ss <- binoculaR::binoculaR(arab4)
-
-arab4 %<>%
-  select(index)
-# save(arab4, file = "data/arab4.Rdata")
-```
 
 # Filter Data
 
@@ -65,12 +51,300 @@ arab4 %<>%
     daesh_resp == "GCC country (other than Saudi Arabia)" ~ "Other Gulf country",
     daesh_resp == "Decline to answer (Do not read)" ~ "Decline to answer",
     TRUE ~ as.character(daesh_resp)
-  ))
+  )) %>% 
+  mutate(threat_cntry_num = ifelse(q826 > 5, 5, q826)) %>% 
+  mutate(threat_cntry = sjmisc::to_label(q826)) %>% 
+  mutate(threat_cntry = case_when(
+    threat_cntry == "Don't know (Do not read)" ~ NA_character_,
+    threat_cntry == "Decline to answer (Do not read)" ~ NA_character_,
+    TRUE ~ as.character(threat_cntry)
+  )) %>% 
+  mutate(threat_reg_num = ifelse(q827 > 5, 5, q827)) %>% 
+  mutate(threat_reg = sjmisc::to_label(q827)) %>% 
+  mutate(threat_reg = case_when(
+    threat_reg == "Don't know (Do not read)" ~ NA_character_,
+    threat_reg == "Decline to answer (Do not read)" ~ NA_character_,
+    TRUE ~ as.character(threat_reg)
+  )) %>% 
+  mutate(daesh_islam_num = ifelse(q828 > 5, 5, q828)) %>% 
+  mutate(daesh_islam = sjmisc::to_label(q828)) %>% 
+  mutate(daesh_islam = case_when(
+    daesh_islam == "Don't know (Do not read)" ~ NA_character_,
+    daesh_islam == "Decline to answer (Do not read)" ~ NA_character_,
+    TRUE ~ as.character(daesh_islam)
+  )) %>% 
+  mutate(daesh_goal_num = ifelse(q829 > 5, 5, 5 - q829)) %>% 
+  mutate(daesh_goal = sjmisc::to_label(q829)) %>% 
+  mutate(daesh_goal = case_when(
+    daesh_goal == "Don't know (Do not read)" ~ NA_character_,
+    daesh_goal == "Decline to answer (Do not read)" ~ NA_character_,
+    TRUE ~ as.character(daesh_goal)
+  )) %>% 
+  mutate(daesh_violence_num = ifelse(q830 > 5, 5, 5 - q830)) %>% 
+  mutate(daesh_violence = sjmisc::to_label(q830)) %>% 
+  mutate(daesh_violence = case_when(
+    daesh_violence == "Don't know (Do not read)" ~ NA_character_,
+    daesh_violence == "Decline to answer (Do not read)" ~ NA_character_,
+    TRUE ~ as.character(daesh_violence)
+  )) %>% 
+  mutate(threat_cntry2 = case_when(
+    threat_cntry == "Don't know (Do not read)" ~ "Don't know",
+    threat_cntry == "Decline to answer (Do not read)" ~ "Decline to answer",
+    TRUE ~ as.character(threat_cntry)
+  )) %>% 
+  mutate(threat_reg2 = case_when(
+    threat_reg == "Don't know (Do not read)" ~ "Don't know",
+    threat_reg == "Decline to answer (Do not read)" ~ "Decline to answer",
+    TRUE ~ as.character(threat_reg)
+  )) %>% 
+  mutate(daesh_islam2 = case_when(
+    daesh_islam == "Don't know (Do not read)" ~ "Don't know",
+    daesh_islam == "Decline to answer (Do not read)" ~ "Decline to answer",
+    TRUE ~ as.character(daesh_islam)
+  )) %>% 
+  mutate(daesh_goal2 = case_when(
+    daesh_goal == "Don't know (Do not read)" ~ "Don't know",
+    daesh_goal == "Decline to answer (Do not read)" ~ "Decline to answer",
+    TRUE ~ as.character(daesh_goal)
+  )) %>% 
+  mutate(daesh_violence2 = case_when(
+    daesh_violence == "Don't know (Do not read)" ~ "Don't know",
+    daesh_violence == "Decline to answer (Do not read)" ~ "Decline to answer",
+    TRUE ~ as.character(daesh_violence)
+  )) %>%   
+  select(cntry, daesh_resp, threat_cntry, threat_cntry_num, threat_reg, threat_reg_num, daesh_islam, daesh_islam_num, daesh_goal, daesh_goal_num, daesh_violence, daesh_violence_num, threat_cntry2, threat_reg2, daesh_islam2, daesh_goal2, daesh_violence2, wt)
+
 ```
 
 
 
 # Plotting
+
+
+## threats cntry
+
+```{r}
+
+nrows <- arab4 %>% 
+  select(cntry, threat_cntry) %>% 
+  na.omit() %>% 
+  nrow()
+
+threat_cntry_pic <- arab4 %>% 
+  mutate(cntry = factor(cntry)) %>% 
+  group_by(threat_cntry, cntry) %>% 
+  summarise(n = n()) %>% 
+  na.omit() %>% 
+  ungroup() %>% 
+  group_by(cntry) %>% 
+  mutate(total = sum(n)) %>% 
+  mutate(percent = n/total) %>% 
+  ungroup() %>% 
+#  mutate(cntry = fct_reorder(cntry, percent, .desc = TRUE)) %>%
+#  mutate(threat_cntry = factor(threat_cntry, order = - as.numeric(threat_cntry))) %>%
+#  mutate(cntry = factor(cntry, order = - as.numeric(cntry))) %>%
+#  mutate(cntry = forcats::fct_infreq(cntry)) %>% 
+#  arrange(cntry) %>% 
+  mutate(cntry = fct_reorder(cntry, percent, .desc = T)) %>% 
+  mutate(threat_cntry = fct_rev(threat_cntry)) %>% 
+  arrange(desc(threat_cntry)) %>% 
+  ggplot(aes(y = percent, x = cntry, fill = threat_cntry)) + 
+    geom_bar(position = "fill", stat = "identity") +
+  geom_text(aes(label = paste0(round(percent * 100, 2),"%")),
+              position = position_fill(vjust = .5), size = 6, color = "white") +
+    # or:
+    #geom_bar(position = position_fill(), stat = "identity") +
+    scale_y_continuous(labels = scales::percent_format()) +
+  coord_flip() +
+  guides(fill = guide_legend(reverse=TRUE)) +
+  theme_hc(base_size = 25) +
+  scale_fill_ptol("") +
+  xlab("") + ylab("") +
+  ggtitle("Does Daesh pose a threat to our country?") + 
+  labs(caption = paste0("N =\t", nrows, ". Data based on Arab Barometer 4 (2017)"), size = 5) + theme(legend.text=element_text(size = 30))
+
+ggsave(threat_cntry_pic, file = "images/threat_cntry.png", width = 18, height = 10)
+```
+
+## threats region
+
+```{r}
+nrows <- arab4 %>% 
+  select(cntry, threat_reg) %>% 
+  na.omit() %>% 
+  nrow()
+
+threat_reg_pic <- arab4 %>% 
+  mutate(cntry = factor(cntry)) %>% 
+  group_by(threat_reg, cntry) %>% 
+  summarise(n = n()) %>% 
+  na.omit() %>% 
+  ungroup() %>% 
+  group_by(cntry) %>% 
+  mutate(total = sum(n)) %>% 
+  mutate(percent = n/total) %>% 
+  ungroup() %>% 
+#  mutate(cntry = fct_reorder(cntry, percent, .desc = TRUE)) %>%
+#  mutate(threat_cntry = factor(threat_cntry, order = - as.numeric(threat_cntry))) %>%
+#  mutate(cntry = factor(cntry, order = - as.numeric(cntry))) %>%
+#  mutate(cntry = forcats::fct_infreq(cntry)) %>% 
+#  arrange(cntry) %>% 
+  mutate(cntry = fct_reorder(cntry, percent, .desc = T)) %>% 
+  mutate(threat_reg = fct_rev(threat_reg)) %>% 
+  arrange(desc(threat_reg)) %>% 
+  ggplot(aes(y = percent, x = cntry, fill = threat_reg)) + 
+    geom_bar(position = "fill", stat = "identity") +
+  geom_text(aes(label = paste0(round(percent * 100, 2),"%")),
+              position = position_fill(vjust = .5), size = 6, color = "white") +
+    # or:
+    #geom_bar(position = position_fill(), stat = "identity") +
+    scale_y_continuous(labels = scales::percent_format()) +
+  coord_flip() +
+  guides(fill = guide_legend(reverse=TRUE)) +
+  theme_hc(base_size = 25) +
+  scale_fill_ptol("") +
+  xlab("") + ylab("") +
+  ggtitle("Does Daesh pose a threat to the Arab region?") + 
+  labs(caption = paste0("N =\t", nrows, ". Data based on Arab Barometer 4 (2017)"), size = 5) + theme(legend.text=element_text(size = 30))
+
+ggsave(threat_reg_pic, file = "images/threat_reg.png", width = 18, height = 10)
+```
+
+## To what extent do you believe Daesh’s tactics are compatible with the teachings of Islam?
+
+```{r}
+nrows <- arab4 %>% 
+  select(cntry, daesh_islam2) %>% 
+  na.omit() %>% 
+  nrow()
+
+daesh_islam2_pic <- arab4 %>% 
+  mutate(cntry = factor(cntry)) %>% 
+  group_by(daesh_islam2, cntry) %>% 
+  summarise(n = n()) %>% 
+#  na.omit() %>% 
+  ungroup() %>% 
+  group_by(cntry) %>% 
+  mutate(total = sum(n)) %>% 
+  mutate(percent = n/total) %>% 
+  ungroup() %>% 
+#  mutate(cntry = fct_reorder(cntry, percent, .desc = TRUE)) %>%
+#  mutate(threat_cntry = factor(threat_cntry, order = - as.numeric(threat_cntry))) %>%
+#  mutate(cntry = factor(cntry, order = - as.numeric(cntry))) %>%
+#  mutate(cntry = forcats::fct_infreq(cntry)) %>% 
+#  arrange(cntry) %>% 
+  mutate(cntry = fct_reorder(cntry, percent, .desc = T)) %>% 
+  mutate(daesh_islam2 = fct_rev(daesh_islam2)) %>% 
+  arrange(desc(daesh_islam2)) %>% 
+  ggplot(aes(y = percent, x = cntry, fill = daesh_islam2)) + 
+    geom_bar(position = "fill", stat = "identity") +
+  geom_text(aes(label = paste0(round(percent * 100, 2),"%")),
+              position = position_fill(vjust = .5), size = 6, color = "white") +
+    # or:
+    #geom_bar(position = position_fill(), stat = "identity") +
+    scale_y_continuous(labels = scales::percent_format()) +
+  coord_flip() +
+  guides(fill = guide_legend(reverse=TRUE)) +
+  theme_hc(base_size = 25) +
+  scale_fill_ptol("") +
+  xlab("") + ylab("") +
+  ggtitle("To what extent do you believe Daesh’s tactics are
+compatible with the teachings of Islam?") + 
+  labs(caption = paste0("N =\t", nrows, ". Data based on Arab Barometer 4 (2017)"), size = 5) + theme(legend.text=element_text(size = 20))
+
+ggsave(daesh_islam2_pic, file = "images/daesh_islam2.png", width = 18, height = 10)
+```
+
+## goals
+
+```{r}
+nrows <- arab4 %>% 
+  select(cntry, daesh_goal) %>% 
+  na.omit() %>% 
+  nrow()
+
+daesh_goal_pic <- arab4 %>% 
+  mutate(cntry = factor(cntry)) %>% 
+  group_by(daesh_goal, cntry) %>% 
+  summarise(n = n()) %>% 
+  na.omit() %>% 
+  ungroup() %>% 
+  group_by(cntry) %>% 
+  mutate(total = sum(n)) %>% 
+  mutate(percent = n/total) %>% 
+  ungroup() %>% 
+#  mutate(cntry = fct_reorder(cntry, percent, .desc = TRUE)) %>%
+#  mutate(threat_cntry = factor(threat_cntry, order = - as.numeric(threat_cntry))) %>%
+#  mutate(cntry = factor(cntry, order = - as.numeric(cntry))) %>%
+#  mutate(cntry = forcats::fct_infreq(cntry)) %>% 
+#  arrange(cntry) %>% 
+  mutate(cntry = fct_reorder(cntry, percent, .desc = T)) %>% 
+  mutate(daesh_islam = fct_rev(daesh_goal)) %>% 
+  arrange(desc(daesh_goal)) %>% 
+  ggplot(aes(y = percent, x = cntry, fill = daesh_goal)) + 
+    geom_bar(position = "fill", stat = "identity") +
+  geom_text(aes(label = paste0(round(percent * 100, 2),"%")),
+              position = position_fill(vjust = .5), size = 6, color = "white") +
+    # or:
+    #geom_bar(position = position_fill(), stat = "identity") +
+    scale_y_continuous(labels = scales::percent_format()) +
+  coord_flip() +
+  guides(fill = guide_legend(reverse=TRUE)) +
+  theme_hc(base_size = 25) +
+  scale_fill_ptol("") +
+  xlab("") + ylab("") +
+  ggtitle("To what extent do you believe Daesh’s tactics are
+compatible with the teachings of Islam?") + 
+  labs(caption = paste0("N =\t", nrows, ". Data based on Arab Barometer 4 (2017)"), size = 5) + theme(legend.text=element_text(size = 20))
+
+ggsave(daesh_goal_pic, file = "images/daesh_goal.png", width = 18, height = 10)
+```
+
+## violence
+
+```{r}
+nrows <- arab4 %>% 
+  select(cntry, daesh_violence) %>% 
+  na.omit() %>% 
+  nrow()
+
+daesh_violence_pic <- arab4 %>% 
+  mutate(cntry = factor(cntry)) %>% 
+  group_by(daesh_violence, cntry) %>% 
+  summarise(n = n()) %>% 
+  na.omit() %>% 
+  ungroup() %>% 
+  group_by(cntry) %>% 
+  mutate(total = sum(n)) %>% 
+  mutate(percent = n/total) %>% 
+  ungroup() %>% 
+#  mutate(cntry = fct_reorder(cntry, percent, .desc = TRUE)) %>%
+#  mutate(threat_cntry = factor(threat_cntry, order = - as.numeric(threat_cntry))) %>%
+#  mutate(cntry = factor(cntry, order = - as.numeric(cntry))) %>%
+#  mutate(cntry = forcats::fct_infreq(cntry)) %>% 
+#  arrange(cntry) %>% 
+  mutate(cntry = fct_reorder(cntry, percent, .desc = T)) %>% 
+  mutate(daesh_islam = fct_rev(daesh_violence)) %>% 
+  arrange(desc(daesh_violence)) %>% 
+  ggplot(aes(y = percent, x = cntry, fill = daesh_violence)) + 
+    geom_bar(position = "fill", stat = "identity") +
+  geom_text(aes(label = paste0(round(percent * 100, 2),"%")),
+              position = position_fill(vjust = .5), size = 6, color = "white") +
+    # or:
+    #geom_bar(position = position_fill(), stat = "identity") +
+    scale_y_continuous(labels = scales::percent_format()) +
+  coord_flip() +
+  guides(fill = guide_legend(reverse=TRUE)) +
+  theme_hc(base_size = 25) +
+  scale_fill_ptol("") +
+  xlab("") + ylab("") +
+  ggtitle("To what extent do you believe Daesh’s tactics are
+compatible with the teachings of Islam?") + 
+  labs(caption = paste0("N =\t", nrows, ". Data based on Arab Barometer 4 (2017)"), size = 5) + theme(legend.text=element_text(size = 20))
+
+ggsave(daesh_violence_pic, file = "images/daesh_violence.png", width = 18, height = 10)
+```
+
 
 ```{r}
 
@@ -162,5 +436,223 @@ sjmisc::frq(sjmisc::to_label(arab4$q709aoppose)) # oppose Israel
 Q831Other. Other specified	
 
 sjmisc::frq(sjmisc::to_label(arab4$q831other))
+```
+
+# sjp.likert
+
+```{r}
+sjPlot::set_theme(theme = "539",
+             geom.label.color = "black", 
+             geom.label.size = 2.5,
+             axis.textsize = .8, 
+             axis.title.size = .9,
+             legend.size = .7,
+             legend.item.size = .5)
+
+labels <- c("Strongly agree",
+            "Agree",
+            "Disagree",
+            "Strongly Disagree",
+            "Decline/Don't Know")
+
+plot_goal_viol <- function(data, country, labels = NULL, width = 6, height = 2, geom.size = 0.3, title = F, save = T, legend = T) {
+  
+  arab_wide <- data %>% 
+  filter(cntry == country) %>% 
+  select(daesh_goal_num, daesh_violence_num, wt)  
+
+gg <- sjp.likert(arab_wide[,1:2], 
+                 wrap.title = 20,
+           weight.by = arab_wide$wt,
+           cat.neutral = 5,
+#           sort.frq = "pos.asc",
+           values = "sum.outside",
+           geom.colors = "RdBu",
+           legend.labels = labels,
+           show.prc.sign = TRUE,
+           show.n = FALSE,    # hide N's in axis labels
+           grid.range = 1,
+           geom.size = geom.size,
+           reverse.colors = TRUE, 
+           expand.grid = 5,
+           axis.labels = c("Daesh's Goals","Daesh's Use of Violence"))$plot +
+  labs(title = country) +
+  theme_hc()
+
+if (title == T) {
+  gg <- gg + labs(title = "To what extent do you agree with the goals
+of Daesh/ Daesh's use of violence?")
+}
+
+if (legend == F) {
+  gg <- gg + theme(legend.position = "none")
+}
+
+
+
+if (save == T) {
+  ggsave(gg, file = paste0("images/goal_viol_", country, ".png"), 
+         width = width, height = height)
+  }
+
+return(gg)
+}
+
+cntrys <- c("Algeria", "Jordan", "Lebanon", "Morocco", "Palestine", 
+"Tunisia")
+
+
+
+for (jj in cntrys) {
+  plot_goal_viol(arab4, jj, save = T, width = 10, height = 5)
+}
+
+goal_viol_alg <- plot_goal_viol(arab4, "Algeria", save = F, legend = F, labels = labels)
+goal_viol_jor <- plot_goal_viol(arab4, "Jordan", save = F, legend = F)
+goal_viol_leb <- plot_goal_viol(arab4, "Lebanon", save = F, legend = F)
+goal_viol_mor <- plot_goal_viol(arab4, "Morocco", save = F, legend = F)
+goal_viol_pal <- plot_goal_viol(arab4, "Palestine", save = F, legend = F)
+goal_viol_tun <- plot_goal_viol(arab4, "Tunisia", save = F, legend = F)
+
+grid_arrange_shared_legend <- function(...,
+           ncol = length(list(...)),
+           nrow = 1,
+           position = c("bottom", "top", "right"),
+           title) {
+    
+    plots <- list(...)
+    position <- match.arg(position)
+    g <-
+      ggplotGrob(plots[[1]] + theme(legend.position = position))$grobs
+    legend <- g[[which(sapply(g, function(x)
+      x$name) == "guide-box")]]
+    lheight <- sum(legend$height)
+    lwidth <- sum(legend$width)
+    gl <- lapply(plots, function(x)
+      x + theme(legend.position = "none"))
+    gl <- c(gl, ncol = ncol, nrow = nrow)
+    
+    combined <- switch(
+      position,
+      "bottom" = arrangeGrob(
+        do.call(arrangeGrob, gl),
+        legend,
+        ncol = 1,
+        top = textGrob(title, gp = gpar(fontsize = 20)),
+        heights = unit.c(unit(0.9, "npc") - lheight, lheight)
+      ),
+      "right" = arrangeGrob(
+        do.call(arrangeGrob, gl),
+        legend,
+        ncol = 2,
+#        main = textGrob("Title goes here", gp = gpar(fontsize = 24)),
+        widths = unit.c(unit(1, "npc") - lwidth, lwidth)
+      )
+    )
+    
+#    title <- textGrob("Title",gp=gpar(fontsize=50))
+    
+#    combined <- gtable_add_grob(
+#    combined, 
+#    title, 1, 1, 1, 1)
+    
+    grid.newpage()
+    grid.draw(combined)
+    
+    # return gtable invisibly
+    invisible(combined)
+}
+
+combined <- grid_arrange_shared_legend( goal_viol_alg, 
+             goal_viol_jor, 
+             goal_viol_leb, 
+             goal_viol_mor, 
+             goal_viol_pal,
+             goal_viol_tun, ncol = 1, nrow = 6, 
+             position = "bottom",
+             title = "To what extent do you agree with the goals
+of Daesh/ Daesh's use of violence?") 
+
+
+ggsave(combined, file = "images/combined.png", height = 10, width = 9)
+, top = "To what extent do you agree with the goals
+of Daesh/ Daesh's use of violence?"
+
+  arab_wide <- arab4 %>% 
+#  filter(cntry == country) %>% 
+  select(daesh_goal_num, daesh_violence_num, wt, cntry)  
+
+gg <- sjp.likert(arab_wide[,1:2], 
+                 wrap.title = 500,
+           weight.by = arab_wide$wt,
+           cat.neutral = 5,
+#           sort.frq = "pos.asc",
+           values = "sum.outside",
+           geom.colors = "RdBu",
+           show.prc.sign = TRUE,
+           show.n = FALSE,    # hide N's in axis labels
+           grid.range = 1,
+           geom.size = 0.3,
+           reverse.colors = TRUE, 
+           expand.grid = 1.2,
+           axis.labels = c("Daesh's Goals","Daesh's Use of Violence"))$plot +
+  facet_wrap(~cntry)
+
+ggsave(ss, file = "data/test.png", width = 6, height = 2)
+
+legend <- get_legend(goal_viol_alg)
+
+combined <- plot_grid(legend,
+  goal_viol_alg, 
+             goal_viol_jor, 
+             goal_viol_leb, 
+             goal_viol_mor, 
+             goal_viol_pal,
+             goal_viol_tun, 
+           align = 'vh',
+#           labels = c("A", "B", "C"),
+#           hjust = -1,
+           ncol = 1, nrow = 7
+           )
+
+ggsave(combined, file = "images/combined.png", height = 10, width = 6)
+cowplot::g
+```
+
+```{r}
+grid_arrange_shared_legend <- function(...,
+           ncol = length(list(...)),
+           nrow = 1,
+           position = c("bottom", "right")) {
+    
+    plots <- list(goal_viol_alg, 
+             goal_viol_jor)
+    position <- match.arg(position)
+    position = "bottom"
+    g <-
+      ggplotGrob(plots[[1]] + theme(legend.position = position))$grobs
+    legend <- g[[which(sapply(g, function(x)
+      x$name) == "guide-box")]]
+    lheight <- sum(legend$height)
+    lwidth <- sum(legend$width)
+    gl <- lapply(plots, function(x)
+      x + theme(legend.position = "none"))
+    gl <- c(gl, ncol = ncol, nrow = nrow)
+    
+    combined <- switch(
+      position,
+      "bottom" = arrangeGrob(
+        do.call(arrangeGrob, gl),
+        legend,
+        ncol = 1,
+        heights = unit.c(unit(1, "npc") - lheight, lheight)
+      ),
+      "right" = arrangeGrob(
+        do.call(arrangeGrob, gl),
+        legend,
+        ncol = 2,
+        widths = unit.c(unit(1, "npc") - lwidth, lwidth)
+      )
+    )
 ```
 
