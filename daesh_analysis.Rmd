@@ -1,0 +1,102 @@
+---
+title: "Daesh Analysis"
+output: html_notebook
+---
+
+# Packages
+
+```{r}
+#pacman::p_install_gh("systats/binoculaR")
+pacman::p_load(tidyverse, magrittr, haven, ggthemes, sjPlot, sjmisc, binoculaR, ggplot2, grid, gridExtra, gtable, cowplot, psych)
+
+#devtools::install_github("thomasp85/patchwork")
+```
+
+# Load in Data
+
+```{r}
+arab4 <- read_spss("data/arab4.sav")
+
+# arab4 <- get(load(url("https://github.com/favstats/GodlyGovernance/raw/master/data/arab4.Rdata")))
+
+```
+
+
+
+# Filter Data
+
+```{r}
+arab4 %<>%
+  filter(q1012 == 1) %>%#only Muslims
+  mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) # %>% 
+#  filter(sample != 2) #only non-refugees
+
+
+
+```
+
+# Recoding
+
+```{r}
+table(arab4$country)
+
+arab4 %<>% 
+  mutate(cntry = sjmisc::to_label(country)) %>% 
+  mutate(cntry = case_when(
+    sample == 2 ~ "Syrian Refugees",
+    TRUE ~ as.character(cntry)
+  )) %>% 
+  mutate(region = sjmisc::to_label(a1)) %>% 
+  mutate(governorate = sjmisc::to_label(q1)) %>%
+  mutate(district = sjmisc::to_label(q2)) %>% 
+  mutate(daesh_resp = factor(sjmisc::to_label(q831))) %>% 
+  mutate(daesh_resp = case_when(
+    daesh_resp == "Don't know (Do not read)" ~ "Don't know",
+    daesh_resp == "GCC country (other than Saudi Arabia)" ~ "Other Gulf country",
+    daesh_resp == "Decline to answer (Do not read)" ~ "Decline to answer",
+    TRUE ~ as.character(daesh_resp)
+  )) %>% 
+  mutate(threat_cntry_num = ifelse(q826 > 5, NA, q826)) %>% 
+  mutate(threat_reg_num = ifelse(q827 > 5, NA, q827)) %>% 
+  mutate(daesh_islam_num = ifelse(q828 > 5, NA, 5 - q828)) %>% 
+  mutate(daesh_goal_num = ifelse(q829 > 5, NA, 5 - q829)) %>% 
+  mutate(daesh_violence_num = ifelse(q830 > 5, NA, 5 - q830)) %>% 
+  select(cntry, daesh_resp, q831other, threat_cntry_num, threat_reg_num, daesh_islam_num, daesh_goal_num, daesh_violence_num, wt)
+
+```
+
+# Excluding ISIS
+
+```{r}
+frq(arab4 %>% select(daesh_islam_num, daesh_goal_num, daesh_violence_num))
+
+arab4 %>% 
+  filter(cntry != "Egypt") %>% 
+  mutate(symp = case_when(
+    daesh_islam_num == 1 ~ 0,
+    daesh_islam_num == 2 ~ 0,
+    daesh_islam_num == 3 ~ 1,
+    daesh_islam_num == 4 ~ 1,
+    daesh_goal_num == 1 ~ 0,
+    daesh_goal_num == 2 ~ 0,
+    daesh_goal_num == 3 ~ 1,
+    daesh_goal_num == 4 ~ 1,
+    daesh_violence_num == 1 ~ 0,
+    daesh_violence_num == 2 ~ 0,
+    daesh_violence_num == 3 ~ 1,
+    daesh_violence_num == 4 ~ 1,
+    TRUE ~ 2
+  )) %>%   
+  mutate(daesh_islam_num = daesh_islam_num - 1) %>% 
+  mutate(daesh_goal_num = daesh_goal_num - 1) %>% 
+  mutate(daesh_violence_num = daesh_violence_num - 1) %>% 
+  mutate(symp2 = daesh_islam_num + daesh_goal_num + daesh_violence_num)%>% 
+  select(daesh_islam_num, daesh_goal_num, daesh_violence_num, symp, symp2) %>% 
+  frq()
+
+arab4 %>% 
+  select(daesh_islam_num, daesh_goal_num, daesh_violence_num, cntry) %>% 
+  na.omit() %>% 
+  select(cntry) %>% 
+  table()
+```

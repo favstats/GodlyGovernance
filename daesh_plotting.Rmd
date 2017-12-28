@@ -7,7 +7,7 @@ output: html_notebook
 
 ```{r}
 #pacman::p_install_gh("systats/binoculaR")
-pacman::p_load(tidyverse, magrittr, haven, ggthemes, sjPlot, binoculaR, ggplot2, grid, gridExtra, gtable, cowplot)
+pacman::p_load(tidyverse, magrittr, haven, ggthemes, sjPlot, sjmisc, binoculaR, ggplot2, grid, gridExtra, gtable, cowplot)
 
 #devtools::install_github("thomasp85/patchwork")
 ```
@@ -64,6 +64,9 @@ arab4 %<>%
   select(cntry, daesh_resp, q831other, threat_cntry_num, threat_reg_num, daesh_islam_num, daesh_goal_num, daesh_violence_num, wt)
 
 ```
+
+
+
 
 # Plotting
 
@@ -131,6 +134,7 @@ if (cntry_fil %in% cntrys) data %<>% filter(cntry == cntry_fil)
   
 n <- data %>% 
   select(cntry, daesh_resp_) %>% 
+  filter(cntry != "Egypt") %>% 
   na.omit() %>% 
   nrow()
   
@@ -251,7 +255,9 @@ grid_arrange_shared_legend <- function(...,
            position = c("bottom", "top", "right"),
            title,
            caption,
-           n = nrow(arab4)) {
+           n = nrow(arab4 %>% 
+                      select(cntry, daesh_goal_num, daesh_goal_num) %>% 
+                      na.omit)) {
     
     plots <- list(...)
     position <- match.arg(position)
@@ -393,7 +399,7 @@ grid_arrange_shared_legend <- function(...,
            position = c("bottom", "top", "right"),
            title,
            caption,
-           n = nrow(arab4)) {
+           n = nrow(arab4 %>% select(cntry, daesh_islam_num) %>% na.omit)) {
     
     plots <- list(...)
     position <- match.arg(position)
