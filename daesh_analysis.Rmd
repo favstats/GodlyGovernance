@@ -6,10 +6,13 @@ output: html_notebook
 # Packages
 
 ```{r}
+#install.packages("pacman")
 #pacman::p_install_gh("systats/binoculaR")
-pacman::p_load(tidyverse, magrittr, haven, ggthemes, sjPlot, sjmisc, binoculaR, ggplot2, grid, gridExtra, gtable, cowplot, psych)
+pacman::p_load(tidyverse, magrittr, haven, ggthemes, sjPlot, sjmisc, sjstats, binoculaR, ggplot2, grid, gridExtra, gtable, cowplot, psych, car, lme4, ggpubr, rmarkdown, texreg, MuMIn, janitor, plotly, here)
 
 #devtools::install_github("thomasp85/patchwork")
+range01 <- function(x){(x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))}
+
 ```
 
 # Load in Data
@@ -18,6 +21,12 @@ pacman::p_load(tidyverse, magrittr, haven, ggthemes, sjPlot, sjmisc, binoculaR, 
 arab4 <- read_spss("data/arab4.sav")
 
 # arab4 <- get(load(url("https://github.com/favstats/GodlyGovernance/raw/master/data/arab4.Rdata")))
+
+ifelse4cat_rec <- function(variable) {
+  recoded <- ifelse(variable == 0 | variable > 5, NA, 5 - variable)
+  return(recoded)
+}
+
 
 ```
 
@@ -31,9 +40,9 @@ arab4 %<>%
   mutate(sample = ifelse(is.na(sample) | sample == 1, 1, 2)) # %>% 
 #  filter(sample != 2) #only non-refugees
 
-
-
 ```
+
+
 
 # Recoding
 
@@ -42,10 +51,14 @@ table(arab4$country)
 
 arab4 %<>% 
   mutate(cntry = sjmisc::to_label(country)) %>% 
+  mutate(region = sjmisc::to_label(a1)) %>% 
+  mutate(governorate = sjmisc::to_label(q1)) %>% 
+  mutate(year = 2016) %>% 
   mutate(cntry = case_when(
     sample == 2 ~ "Syrian Refugees",
     TRUE ~ as.character(cntry)
   )) %>% 
+  filter(cntry != "Egypt") %>% 
   mutate(region = sjmisc::to_label(a1)) %>% 
   mutate(governorate = sjmisc::to_label(q1)) %>%
   mutate(district = sjmisc::to_label(q2)) %>% 
@@ -60,8 +73,64 @@ arab4 %<>%
   mutate(threat_reg_num = ifelse(q827 > 5, NA, q827)) %>% 
   mutate(daesh_islam_num = ifelse(q828 > 5, NA, 5 - q828)) %>% 
   mutate(daesh_goal_num = ifelse(q829 > 5, NA, 5 - q829)) %>% 
-  mutate(daesh_violence_num = ifelse(q830 > 5, NA, 5 - q830)) %>% 
-  select(cntry, daesh_resp, q831other, threat_cntry_num, threat_reg_num, daesh_islam_num, daesh_goal_num, daesh_violence_num, wt)
+  mutate(daesh_violence_num = ifelse(q830 > 5, NA, 5 - q830)) 
+
+
+# Dependent Variable
+arab4 %<>% 
+  mutate(islamistparties = ifelse(q5182 > 5, NA, 5 - q5182)) %>% 
+  mutate(islamistgov = ifelse(q5184 > 5, NA, 5 - q5184)) %>% 
+  mutate(religinterfere = ifelse(q6061 > 5, NA, q6061)) %>% 
+  mutate(religleaders = ifelse(q6062 > 5, NA, 5 - q6062)) %>% 
+  mutate(religleadersinfl = ifelse(q6063 > 5, NA, 5 - q6063)) %>%
+  mutate(seperation = ifelse(q6064 > 5, NA, q6064)) %>% 
+  mutate(religparty = Recode(q605a, "1 = 1;
+                                     2 = 1;
+                                     3 = 0;
+                                     4 = 0;
+                                     5 = 0;
+                                    98 = 0;
+                                    99 = NA")) %>% 
+  mutate(religparty2 = Recode(q605a, "1 = 5;
+                                      2 = 4;
+                                      3 = 2;
+                                      4 = 1;
+                                      5 = 3;
+                                     98 = NA;
+                                     99 = NA"))
+
+
+
+arab4 %<>% 
+  mutate(female = ifelse(q1002 == 2, 1, 0)) %>% 
+  mutate(work = ifelse(q1004 == 0 | q1004 > 5, NA, abs(q1004 - 2))) %>% 
+  mutate(income = ifelse4cat_rec(q1016)) %>% 
+  mutate(age = ifelse(q1001 == 0 | q1001 == 9999, NA, q1001)) %>% 
+  mutate(educ = case_when(
+        q1003 == 0 ~ NA_real_,
+        q1003 == 98 ~ NA_real_,
+        q1003 == 99 ~ NA_real_,
+        q1003 == 5 ~ 4,
+        q1003 == 6 ~ 5,
+        q1003 == 7 ~ 6,
+        t1003 == 0 ~ NA_real_,
+        t1003 == 98 ~ NA_real_,
+        t1003 == 99 ~ NA_real_,
+        t1003 == 3 ~ 3,
+        t1003 == 4 ~ 4,
+        t1003 == 5 ~ 5,
+        t1003 == 6 ~ 6,
+    TRUE ~ as.numeric(q1003))
+    ) %>% 
+  mutate(globalism = ifelse(q701b == 0 | q701b > 5, NA, q701b)) %>% 
+  mutate(pray = ifelse(q6101 == 0 | q6101 > 5, NA, 6 - q6101)) %>% 
+  mutate(quran = ifelse(q6106 == 0 | q6106 > 5, NA, 6 - q6106)) %>% 
+  mutate(womanwork = ifelse(q6012 == 0 | q6012 > 5, NA, q6012)) %>% 
+  mutate(womenleader = ifelse4cat_rec(q6013)) %>% 
+  mutate(womeneduc = ifelse4cat_rec(q6014)) %>% 
+  mutate(nodemoc = ifelse(q6071 == 0 | q6071 > 5, NA, q6071)) %>% 
+  mutate(genderapartuni = ifelse4cat_rec(q6074)) %>% 
+  mutate(coverup = ifelse4cat_rec(q6076)) 
 
 ```
 
@@ -70,33 +139,567 @@ arab4 %<>%
 ```{r}
 frq(arab4 %>% select(daesh_islam_num, daesh_goal_num, daesh_violence_num))
 
-arab4 %>% 
-  filter(cntry != "Egypt") %>% 
+arab4 %<>% 
   mutate(symp = case_when(
+#    daesh_islam_num == 1 ~ 0,
+#    daesh_islam_num == 2 ~ 0,
+    daesh_islam_num == 3 ~ 1,
+    daesh_islam_num == 4 ~ 1,
+#    daesh_goal_num == 1 ~ 0,
+#    daesh_goal_num == 2 ~ 0,
+    daesh_goal_num == 3 ~ 1,
+    daesh_goal_num == 4 ~ 1,
+#    daesh_violence_num == 1 ~ 0,
+#    daesh_violence_num == 2 ~ 0,
+    daesh_violence_num == 3 ~ 1,
+    daesh_violence_num == 4 ~ 1,
+    TRUE ~ 0
+  )) %>%   
+  mutate(compatible = case_when(
     daesh_islam_num == 1 ~ 0,
     daesh_islam_num == 2 ~ 0,
     daesh_islam_num == 3 ~ 1,
     daesh_islam_num == 4 ~ 1,
+    TRUE ~ NA_real_
+  )) %>%   
+  mutate(goals = case_when(
     daesh_goal_num == 1 ~ 0,
     daesh_goal_num == 2 ~ 0,
     daesh_goal_num == 3 ~ 1,
     daesh_goal_num == 4 ~ 1,
+    TRUE ~ NA_real_
+  )) %>%   
+  mutate(violence = case_when(
     daesh_violence_num == 1 ~ 0,
     daesh_violence_num == 2 ~ 0,
     daesh_violence_num == 3 ~ 1,
     daesh_violence_num == 4 ~ 1,
-    TRUE ~ 2
+    TRUE ~ NA_real_
   )) %>%   
-  mutate(daesh_islam_num = daesh_islam_num - 1) %>% 
-  mutate(daesh_goal_num = daesh_goal_num - 1) %>% 
-  mutate(daesh_violence_num = daesh_violence_num - 1) %>% 
-  mutate(symp2 = daesh_islam_num + daesh_goal_num + daesh_violence_num)%>% 
-  select(daesh_islam_num, daesh_goal_num, daesh_violence_num, symp, symp2) %>% 
-  frq()
+  mutate(symp2 = daesh_islam_num + daesh_goal_num + daesh_violence_num) %>% 
+  mutate(symp3 = ifelse(symp2 >= 5, 1, 0)) %>% 
+  select(cntry, year, region, governorate , islamistparties , islamistgov, religinterfere, religleaders, religleadersinfl, seperation, religparty, religparty2, female, work, income,  age, educ, globalism, pray, quran, womanwork, womenleader, womeneduc, nodemoc, genderapartuni, coverup, daesh_islam_num, daesh_goal_num, daesh_violence_num, symp, symp2, symp3, wt, compatible, goals, violence) #%>% 
+#  filter(daesh_islam_num >= 3 | daesh_goal_num >= 3 | daesh_violence_num >= 3) %>% 
+#  select(daesh_islam_num, daesh_goal_num, daesh_violence_num, symp, symp2, symp3) %>% 
+#  frq()
 
 arab4 %>% 
   select(daesh_islam_num, daesh_goal_num, daesh_violence_num, cntry) %>% 
   na.omit() %>% 
   select(cntry) %>% 
   table()
+
+
+arab4 %>% 
+  select(compatible, goals, violence, cntry) %>% 
+  frq()
 ```
+
+# Factor Analysis
+
+```{r}
+f31 <- arab4 %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f31)                                  
+f31              
+
+arab4 <- predict(f31, arab4 %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl)) %>% 
+  data.frame() %>% 
+  rename(islamism = PA1) %>% 
+  cbind(arab4) 
+#%>% 
+#  ggplot(aes(islamism)) +
+#  geom_histogram() +
+#  facet_wrap(~cntry, scales = "free")
+
+#sjPlot::view_df(arab, show.frq = T, show.prc = T)
+
+
+f21 <- arab4 %>% 
+  select(daesh_islam_num, daesh_goal_num, daesh_violence_num) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f21)                                  
+f21              
+
+arab4 <- predict(f21, arab4 %>% 
+  select(daesh_islam_num, daesh_goal_num, daesh_violence_num)) %>% 
+  data.frame() %>% 
+  mutate(support = range01(PA1)) %>% 
+  select(support) %>% 
+  cbind(arab4)  #%>% 
+
+hist(arab4$support)
+```
+
+# Creating indices
+
+```{r}
+f1 <- arab4 %>% 
+  select(womanwork, womenleader, womeneduc) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f1)                                  
+f1        
+
+f2 <- arab4 %>% 
+  select(pray, quran) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f2)                                  
+f2    
+
+f3 <- arab4 %>% 
+  select(nodemoc, genderapartuni, coverup) %>% 
+  fa(1, rotate = "promax",   
+        fm = "pa",
+        scores = "regression")           
+fa.diagram(f3)                                  
+f3    
+
+arab4 %>% 
+  select(nodemoc, genderapartuni, coverup) %>% 
+  KMO()
+
+
+arab4_reg <- arab4 %>% 
+  mutate(patriarchalvalues = womanwork + womenleader + womeneduc)  %>% 
+  mutate(personalpiety = pray + quran) %>% 
+# mutate(islamism = scale(islamism)) %>% 
+#  mutate_if(.predicate = is.double, scale) 
+  mutate(liberalislam = nodemoc + genderapartuni + coverup) %>% 
+  mutate(cntryears = paste(cntry, year))
+
+
+arab4_reg$islamism <- as.numeric(range01(arab4_reg$islamism) * 100)
+
+arab4_reg$income             <- as.numeric(scale(arab4_reg$income))
+arab4_reg$age                <- as.numeric(scale(arab4_reg$age))
+arab4_reg$educ               <- as.numeric(scale(arab4_reg$educ)) 
+arab4_reg$globalism          <- as.numeric(scale(arab4_reg$globalism))   
+arab4_reg$personalpiety      <- as.numeric(scale(arab4_reg$personalpiety))       
+arab4_reg$patriarchalvalues  <- as.numeric(scale(arab4_reg$patriarchalvalues))           
+arab4_reg$liberalislam       <- as.numeric(scale(arab4_reg$liberalislam))     
+
+```
+# Visualizations
+
+```{r}
+table(arab4_reg$income)
+
+t.test(arab4_reg$liberalislam ~ arab4_reg$symp)
+
+
+ggviolin(arab4_reg, x = "symp3", y = "personalpiety",
+                color = "symp3", palette =c("#00AFBB", "#E7B800"),
+                 shape = "symp3")
+
+cntrys <- c("Algeria", "Jordan", "Lebanon", "Morocco", "Palestine", "Tunisia", "Syrian Refugees")
+
+ss <- list()
+for (jj in cntrys) {
+ss[[jj]] <- arab4_reg %>% 
+  filter(cntry == jj) %>%  
+  select(cntry, personalpiety, symp3) %>% 
+  na.omit() %>% 
+ggviolin(x = "symp3", y = "personalpiety", fill = "symp3",
+         palette = c("#00AFBB", "#E7B800"),
+         add = "boxplot", add.params = list(fill = "white")) +
+  stat_compare_means(label.y = 2) + ggtitle(jj)                              # Add global the p-value 
+}
+
+ss
+
+table(arab4$symp)
+#
+#arab4_reg %>% 
+#  mutate(symp = as.factor(symp)) %>% 
+#ggbarplot(x = "symp", y = "personalpiety",
+#         # fill = "symp",           # change fill color by mpg_level
+#          color = "white",            # Set bar border colors to white
+#          palette = "jco",            # jco journal color palett. see ?ggpar
+#          sort.val = "asc",           # Sort the value in ascending order
+#          sort.by.groups = FALSE,     # Don't sort inside each group
+#          x.text.angle = 90,          # Rotate vertically x axis texts
+#          ylab = "MPG z-score",
+#          xlab = FALSE,
+#          legend.title = "MPG Group"
+#          )
+#
+arab4_reg %>% 
+#  select(educ, symp2) %>% 
+  ggplot(aes(income, symp2)) + 
+#  geom_point() +
+  geom_smooth(method = "lm")
+
+arab4_reg %>% 
+  mutate(symp = as.factor(symp)) %>% 
+ggscatter(x = "personalpiety", y = "symp2",
+   color = "symp" , shape = 21, size = 3, # Points color, shape and size
+   add = "reg.line",  # Add regressin line
+   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+   conf.int = TRUE, # Add confidence interval
+   cor.coef = TRUE, # Add correlation coefficient. see ?stat_cor
+   cor.coeff.args = list(method = "pearson", label.x = 3, label.sep = "\n"),  facet.by = "cntry"
+   )
+
+
+  arab4_reg %>% 
+#  select(educ, symp2) %>% 
+  ggplot(aes(islamism, symp2)) + 
+#  geom_point() +
+  geom_smooth(method = "lm") +
+    facet_wrap(~cntry) + stat_cor()
+  
+  pacman::p_load("yarrr")
+  pirateplot(formula = support ~ round(nodemoc),
+           data = arab4_reg,
+           main = "Fully customized pirateplot",
+           pal = "southpark", # southpark color palette
+           bean.f.o = .0, # Bean fill
+           point.o = .0, # Points
+           inf.f.o = .7, # Inference fill
+           inf.b.o = .0, # Inference border
+           avg.line.o = 1, # Average line
+           bar.f.o = .5, # Bar
+           inf.f.col = "white", # Inf fill col
+           inf.b.col = "black", # Inf border col
+           avg.line.col = "black", # avg line col
+           bar.f.col = gray(.8), # bar filling color
+           point.pch = 21,
+           point.bg = "white",
+           point.col = "black",
+           point.cex = .7)
+  
+  
+arab4_reg %>% 
+  ggplot(aes(factor(symp), personalpiety)) +
+  geom_boxplot()
+
+
+  pirateplot(formula = symp3 ~ round(personalpiety),
+           data = arab4_reg,
+           main = "Reducing a pirateplot to a barplot",
+           theme = 0, # Start from scratch
+           bar.f.o = .7) # Just turn on the bars
+  
+
+  
+ss <- sjt.xtab(round(arab4_reg$personalpiety), 
+         arab4_reg$symp, 
+         weight.by = arab4_reg$wt, 
+         show.row.prc = T,show.col.prc = T)
+
+
+# arab4_reg %>% 
+#   mutate(perc_support = )
+# 
+# prop.table(arab4_reg$symp3)
+# 
+#  prop.table(stats::xtabs(arab4_reg$wt ~ # arab4_reg$personalpiety))
+#   prop.table(stats::xtabs(arab4_reg$wt ~ arab4_reg$symp3))
+# 
+# janitor::crosstab(arab4_reg$symp3, # round(range01(arab4_reg$personalpiety)*4))
+# 
+# #install.packages("questionr")
+# library(descr)
+# ss <- crosstab(arab4_reg$symp3, # round(range01(arab4_reg$personalpiety)*4), weight = # arab4_reg$wt) %>% as.data.frame.complex() %>% tbl_df
+# 
+# 
+# perc_dat <- questionr::wtd.table(arab4_reg$symp3, 
+#                      # round(range01(arab4_reg$personalpiety)*4), 
+#                      weights = arab4_reg$wt) %>% 
+#   t() %>% 
+#   as.data.frame.matrix() %>% 
+#   cbind(row_sums(perc_dat)) %>%
+#   mutate(supp_perc = `1`/rowsums)
+#   mutate(personalpiety = 0:4) #%>% 
+# #%>% 
+#   #gather("personalypiety", "total", -support) 
+# #
+# #arab4_reg %>% 
+# #  select(symp3, personalpiety, wt) %>% 
+# #  group_by(symp3, personalpiety) %>%
+# #  summarise(count_w = sum(wt)) %>%
+# #  mutate(freq = count_w/sum(count_w))  %>% 
+# #  na.omit()
+# 
+# questionr::cross.multi.table(df = arab4_reg %>%  # select(age, work), 
+#                              crossvar = # as.numeric(arab4_reg$symp3),
+#                              weights = # as.numeric(arab4_reg$wt), freq = T, tfreq = "row")
+
+all <- sjp.xtab(round(range01(arab4_reg$personalpiety)*4), 
+               arab4_reg$symp3,
+               weight.by = arab4_reg$wt, 
+               coord.flip = T, 
+               margin = "row" )$mydf
+all$cntry <- "All"
+
+line_plots <- function(country, variable) {
+
+  arab4_reg %<>% 
+    filter(cntry == country)
+ss <- sjp.xtab(round(range01(arab4_reg$personalpiety)*4),
+               arab4_reg$symp3,
+               weight.by = arab4_reg$wt, 
+               coord.flip = T, 
+               margin = "row", prnt.plot = F)$mydf
+ss$cntry <- country
+return(ss)
+}
+
+ss <- dput(unique(arab4_reg$cntry)) %>% 
+  map_df(line_plots) %>% 
+  rbind(all)
+
+
+
+## Two-way frequency table on 'music' variables by sex
+ss %>% 
+  select(rowname, group, prc, n, cntry) %>% 
+  filter(group == "X1") %>% 
+  ggplot(aes(x = rowname, y = prc, group = cntry, color = cntry)) +
+#  geom_point() +
+  geom_line() +
+  facet_wrap(~cntry)
+
+
+
+plotly::ggplotly()
+
+table(arab4_reg$educ)
+```
+# education
+
+```{r}
+
+
+all <- sjp.xtab(round(range01(arab4_reg$educ)*6), 
+               arab4_reg$symp3,
+               weight.by = arab4_reg$wt, 
+               coord.flip = T, 
+               margin = "row" )$mydf
+all$cntry <- "All"
+
+line_plots <- function(country, variable) {
+
+  arab4_reg %<>% 
+    filter(cntry == country)
+ss <- sjp.xtab(round(range01(arab4_reg$educ)*6),
+               arab4_reg$symp3,
+               weight.by = arab4_reg$wt, 
+               coord.flip = T, 
+               margin = "row", prnt.plot = F)$mydf
+ss$cntry <- country
+return(ss)
+}
+
+ss <- dput(unique(arab4_reg$cntry)) %>% 
+  map_df(line_plots) %>% 
+  rbind(all)
+
+
+
+## Two-way frequency table on 'music' variables by sex
+ss %>% 
+  select(rowname, group, prc, n, cntry) %>% 
+  filter(group == "X1") %>% 
+  ggplot(aes(x = rowname, y = prc, group = cntry, color = cntry)) +
+#  geom_point() +
+  geom_line() + 
+  facet_wrap(~cntry, scales = "free")
+
+plotly::ggplotly()
+```
+
+```{r}
+get_data <- function(arab4_reg, whichone, scale) {
+  
+all <- sjp.xtab(round(range01(whichone)*scale), 
+               arab4_reg$symp3,
+               weight.by = arab4_reg$wt, 
+               coord.flip = T, 
+               margin = "row" )$mydf
+all$cntry <- "All"
+
+line_plots <- function(country) {
+  whichone <- whichone
+
+arab4_reg %<>% 
+    filter(cntry == country)
+ss <- sjp.xtab(round(range01(whichone)*scale),
+               arab4_reg$symp3,
+               weight.by = arab4_reg$wt, 
+               coord.flip = T, 
+               margin = "row", prnt.plot = F)$mydf
+ss$cntry <- country
+return(ss)
+}
+
+ss <- dput(unique(arab4_reg$cntry)) %>% 
+  map_df(line_plots) %>% 
+  rbind(all)
+
+return(ss)
+}
+
+get_data(arab4_reg = arab4_reg, whichone = arab4_reg$income, scale = 4)
+
+table(arab4_reg$nodemoc)
+```
+
+
+# Linear Regressions
+
+```{r}
+model0 <- arab4_reg %>% 
+  lme4::lmer(symp2 ~ 1 + (1|cntry/year), data = .)
+
+icc(model0)
+
+model1 <- lme4::lmer(symp2 ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + islamism + (1|cntry), data = arab4_reg)
+
+texreg::screenreg(model1)
+
+plot_model(model1, type = "re", sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+#plot_model(model1, type = "std", sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+sjp.lmer(model1, type = "fe.std", sort.est = T, show.values = T, show.p = T, y.offset = 0.4, p.kr = FALSE)
+
+plot_model(model1, terms = c("liberalislam", "personalpiety"), type = "pred")
+
+```
+
+# Poisson Regressions
+
+```{r}
+#summary(m1 <- glm(support ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam, family="poisson", data=arab4_reg))
+
+#plot_model(m1)
+```
+
+
+# Logistic Regressions
+
+```{r}
+fit1 <- glmer(symp ~ 1 +(1|cntry), data = arab4_reg,
+              family = binomial("logit"))
+
+icc(fit1)
+dats <- arab4_reg %>% 
+  select(symp, female, work, income, age, educ , personalpiety ,  patriarchalvalues, liberalislam, cntry,
+         nodemoc, genderapartuni, coverup,
+womanwork, womenleader, womeneduc, liberalislam, islamism) %>% 
+  sample_frac(1) %>% 
+  na.omit()
+dats$new <- log((1-range01(dats$personalpiety))+1*8)
+hist(dats$new)
+fit2 <- glmer(symp ~ female + work + income + age + educ + new + nodemoc+ genderapartuni+ coverup + 
+womanwork+ womenleader+ womeneduc + work * educ+#Religiosity and Moderation
+                (1 |cntry), data = dats,
+              family = binomial("logit"))#, 
+          #    glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+summary(fit2)
+icc(fit2)
+
+texreg::screenreg(fit2)
+
+plot_model(fit2, terms = c("personalpiety"), type = "eff")
+plot_model(fit2, terms = c("nodemoc"), type = "eff")
+plot_model(fit2, terms = c("womeneduc"), type = "eff")
+ss <- sjp.glmer(fit2, type = "fe.std", sort.est = T, show.values = T, show.p = T, y.offset = 0.4, p.kr = FALSE)
+sjp.int(fit2)
+
+#ss
+library(MuMIn)
+r.squaredGLMM(fit2)
+
+options(scipen = 999)
+pacman::p_load(logistf, brms, glmmTMB, rstanarm)
+lr2 = logistf(symp ~ female + work + income + age + educ + personalpiety + nodemoc+ genderapartuni+ coverup + 
+womanwork+ womenleader+ womeneduc, data = dats)
+summary(lr2)
+
+
+brm(symp ~ 1+ #Religiosity and Moderation
+                (1 |cntry), data = dats,
+              family = binomial("logit"))
+
+#m1 <- brm(
+#  symp ~ 1+ #Religiosity and Moderation
+#                (1 |cntry), data = dats,
+#  family = zero_inflated_poisson(link = "log", link_zi = "logit")
+#)
+
+m2 <- stan_glmer.nb(
+  symp ~ female + work + income + age + educ + personalpiety + nodemoc+ genderapartuni+ coverup + 
+womanwork+ womenleader+ womeneduc+ #Religiosity and Moderation
+                (1 |cntry), data = dats
+)
+
+summary(m2)
+theme_set(theme_sjplot())
+plot_model(m2, type = "pred", terms = c("personalpiety", "nodemoc"), ci.lvl = .001)
+
+plot_model(m2, bpe = "mean", bpe.style = "dot")
+
+m3 <- stan_glmer( symp ~ female + work + income + age + educ + personalpiety + nodemoc+ genderapartuni+ coverup + 
+womanwork+ womenleader+ womeneduc+ liberalislam + islamism +#Religiosity and Moderation
+                (1 |cntry), data = dats
+)
+
+tidy_stan(m3)
+
+plot_model(m3, type = "pred", terms = c("islamism", "nodemoc"), ci.lvl = .001)
+
+plot_model(m3, bpe = "mean", bpe.style = "dot", sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+plot(m3, prob = 0.5, pars = "beta")
+
+params <-  c("female" , "work" , "income" , "age" , "educ" , "personalpiety" , "nodemoc", "genderapartuni", "coverup" , 
+"womanwork", "womenleader", "womeneduc")
+
+plot(m3, plotfun = "areas", prob = 0.9, # ?bayesplot::mcmc_areas
+     pars = params)
+
+pp_check(m3, plotfun = "error_binned")  # ?bayesplot::ppc_error_binned
+
+
+
+
+plooots <- function(variables) {
+  plot(m3, plotfun = "combo", regex_pars = variables)
+}
+
+params %>% 
+  map(plooots)
+
+(loo1 <- loo(m3))
+
+# Predicted probability as a function of x
+pr_switch <- function(x, ests) plogis(ests[1] + ests[2] * x)
+# A function to slightly jitter the binary data
+jitt <- function(...) {
+  geom_point(aes_string(...), position = position_jitter(height = 0.05, width = 0.1), 
+             size = 2, shape = 21, stroke = 0.2)
+}
+ggplot(arab4_reg, aes(x = personalpiety, y = symp, color = symp)) + 
+  scale_y_continuous(breaks = c(0, 0.5, 1)) +
+  jitt(x="personalpiety") + 
+  stat_function(fun = pr_switch, args = list(ests = coef(m3)), 
+                size = 2, color = "gray35") + geom_smooth(method = "lm")
+
+
+
+```
+

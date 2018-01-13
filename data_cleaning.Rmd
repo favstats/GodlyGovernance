@@ -14,7 +14,9 @@ output: html_notebook
 #devtools::install_github("lme4/lme4",dependencies=TRUE)
 #pacman::p_install_gh("systats/binoculaR")
 
-pacman::p_load(tidyverse, haven, magrittr, car, psych, sjPlot, sjstats, sjmisc, lme4, binoculaR)
+pacman::p_load(tidyverse, haven, magrittr, car, psych, sjPlot, sjstats, sjmisc, lme4, binoculaR, MuMIn)
+
+
 ```
 
 # Load in Data
@@ -24,6 +26,7 @@ arab4 <- read_spss("data/arab4.sav")
 arab3 <- read_spss("data/arab3.sav")
 
 # arab4 <- get(load(url("https://github.com/favstats/GodlyGovernance/raw/master/data/arab4.Rdata")))
+
 
 ```
 
@@ -247,14 +250,19 @@ table(arab$cntry)
 # Factor Analysis
 
 ```{r}
-f31 <- arab %>% 
+f1 <- arab %>% 
   select(islamistparties, islamistgov, 
          religleaders, religleadersinfl) %>% 
   fa(1, rotate = "promax",   
         fm = "pa",
         scores = "regression")           
 fa.diagram(f31)                                  
-f31              
+f1              
+
+f2 <- arab %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl) %>% 
+  psych::pca() 
 
 arab %>% 
   select(islamistparties, islamistgov, 
@@ -275,17 +283,27 @@ arab4 %>%
   na.omit() %>% 
   cor()  
 
-arab <- predict(f31, arab %>% 
+arab <- predict.psych(f1, arab %>% 
   select(islamistparties, islamistgov, 
          religleaders, religleadersinfl)) %>% 
-  data.frame() %>% 
+  tbl_df() %>% 
   cbind(arab) %>% 
-  mutate(islamism = PA1) #%>% 
+  mutate(islamism_fa = PA1)
+
+arab <- predict.psych(f2, arab %>% 
+  select(islamistparties, islamistgov, 
+         religleaders, religleadersinfl)) %>% 
+  tbl_df() %>% 
+  cbind(arab) %>% 
+  mutate(islamism_pca = PC1)
+#%>% 
 #  ggplot(aes(islamism)) +
 #  geom_histogram() +
 #  facet_wrap(~cntry, scales = "free")
 
 #sjPlot::view_df(arab, show.frq = T, show.prc = T)
+
+cor.test(arab$PC1, arab$PA1)
 
 ```
 
@@ -299,6 +317,10 @@ f1 <- arab %>%
         scores = "regression")           
 fa.diagram(f1)                                  
 f1        
+
+arab %>% 
+  select(womanwork, womenleader, womeneduc) %>% 
+  psych::pca() 
 
 f2 <- arab %>% 
   select(pray, quran) %>% 
@@ -320,19 +342,25 @@ arab %>%
   select(nodemoc, genderapartuni, coverup) %>% 
   KMO()
 
+arab %>% 
+  select(nodemoc, genderapartuni, coverup) %>% 
+  psych::pca()
+
 range01 <- function(x){(x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))}
 
 
 arab_reg <- arab %>% 
   mutate(patriarchalvalues = womanwork + womenleader + womeneduc)  %>% 
   mutate(personalpiety = pray + quran) %>% 
-# mutate(islamism = scale(islamism)) %>% 
+#  mutate(islamism = scale(islamism)) %>% 
+#  mutate(islamism = scale(islamism)) %>% 
 #  mutate_if(.predicate = is.double, scale) 
   mutate(liberalislam = nodemoc + genderapartuni + coverup) %>% 
   mutate(cntryears = paste(cntry, year))
 
 
-arab_reg$islamism <- as.numeric(range01(arab_reg$islamism) * 100)
+arab_reg$islamism_fa <- as.numeric(range01(arab_reg$islamism_fa) * 100)
+arab_reg$islamism_pca <- as.numeric(range01(arab_reg$islamism_pca) * 100)
 
 arab_reg$income             <- as.numeric(scale(arab_reg$income))
 arab_reg$age                <- as.numeric(scale(arab_reg$age))
@@ -342,6 +370,15 @@ arab_reg$personalpiety      <- as.numeric(scale(arab_reg$personalpiety))
 arab_reg$patriarchalvalues  <- as.numeric(scale(arab_reg$patriarchalvalues))           
 arab_reg$liberalislam       <- as.numeric(scale(arab_reg$liberalislam))     
 
+hist(arab_reg$liberalislam)
+
+
+arab_reg %>% 
+  select(islamism_pca , female , work , income , age , educ , globalism , personalpiety , patriarchalvalues , liberalislam, cntry) %>% 
+  descr()
+  na.omit() %>% 
+  select(cntry) %>% 
+  table()
 ```
 
 
@@ -349,13 +386,19 @@ arab_reg$liberalislam       <- as.numeric(scale(arab_reg$liberalislam))
 
 ```{r}
 model0 <- arab_reg %>% 
-  lme4::lmer(islamism ~ 1 + (1|cntry/year), data = .)
+  lme4::lmer(islamism_pca ~ 1 + (1|cntry), data = .)
 
 icc(model0)
 
-model1 <- lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + (1|cntry/year), data = arab_reg)
+model1a <- lme4::lmer(islamism_pca ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + nodemoc + genderapartuni + coverup + (1|cntry), data = arab_reg)
+
+model1b <- lme4::lmer(islamism_pca ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + (1|cntry), data = arab_reg)
 
 texreg::screenreg(model1)
+
+anova(model1a, model1b)
+
+r.squaredGLMM(model1a)
 
 plot_model(model1, type = "re", sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
 
@@ -363,18 +406,18 @@ plot_model(model1, type = "re", sort.est = T, show.values = T, show.p = T, value
 
 sjp.lmer(model1, type = "fe.std", sort.est = T, show.values = T, show.p = T, y.offset = 0.4, p.kr = FALSE)
 
-plot_model(model1, terms = c("liberalislam", "personalpiety"), type = "pred")
+plot_model(model1, terms = c("personalpiety"), type = "eff")
 
 icc(model1)
 
-model2 <- lme4::lmer(islamism ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + liberalislam*personalpiety + (1|cntry/year), data = arab_reg)
+model2 <- lme4::lmer(islamism_pca ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + liberalislam + liberalislam*personalpiety + (1|cntry/year), data = arab_reg)
 
 texreg::screenreg(model2)
 
 
 plot_model(model2, sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
 
-sjp.int(model2, p.kr = FALSE)
+sjp.int(model2, p.kr = FALSE, mdrt.values = "all")
 
 sjp.lmer(model2, type = "fe.std", sort.est = T, show.values = T, show.p = T, y.offset = 0.4, p.kr = FALSE)
 
@@ -401,6 +444,19 @@ vif.mer <- function (fit) {
 }
 
 vif.mer(model2)
+
+
+
+model3 <- lme4::lmer(islamism_pca ~ female + work + income + age + educ + globalism + personalpiety + patriarchalvalues + nodemoc + genderapartuni + coverup + patriarchalvalues*personalpiety + (1|cntry/year), data = arab_reg)
+
+texreg::screenreg(model3)
+
+
+plot_model(model3, sort.est = T, show.values = T, show.p = T, value.offset = 0.5)
+
+sjp.int(model3, p.kr = FALSE, mdrt.values = "all")
+
+sjp.lmer(model3, type = "fe.std", sort.est = T, show.values = T, show.p = T, y.offset = 0.4, p.kr = FALSE)
 
 ```
 
