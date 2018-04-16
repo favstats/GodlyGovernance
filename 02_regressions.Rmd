@@ -1,0 +1,131 @@
+---
+title: "regressions"
+output: html_notebook
+---
+
+# Load in Data and Packages
+
+```{r}
+pacman::p_load(tidyverse, haven, magrittr, car, psych, sjPlot, sjstats, sjmisc, lme4, binoculaR, MuMIn)
+
+load("data/arab_reg.Rdata")
+
+table(arab_reg$cntry, arab_reg$governorate)
+
+arab_reg %>% 
+  filter(cntry == "Egypt") %>% 
+  select(governorate) %>% 
+  unique() %>% 
+  arrange(governorate)
+
+```
+
+# LMER
+
+
+```{r}
+model0 <- arab_reg %>% 
+  lme4::lmer(islamism ~ 1 + (1|cntry), data = ., weights = wt)
+
+icc(model0)
+
+model1 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                # globalism + personalpiety + patriarchalvalues + liberalislam + 
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model2 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + #personalpiety + patriarchalvalues + liberalislam + 
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model3 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + #personalpiety + patriarchalvalues + liberalislam + 
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model4 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + #patriarchalvalues + liberalislam + 
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model5 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + #liberalislam + 
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model6 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam + 
+                 (1|cntry), data = arab_reg, weights = wt)
+
+texreg::screenreg(list(model1, model2, model3, model4, model5, model6))
+```
+
+
+
+# Interactions
+
+```{r}
+model7 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 globalism*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model8 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 patriarchalvalues*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model9 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 liberalislam*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt)
+
+texreg::screenreg(list(model6, model7, model8, model9))
+```
+
+# GLMER
+
+```{r}
+model1a <- glmer(religparty ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 (1|cntry), data = arab_reg, weights = wt,
+              family = binomial)
+
+model1b <- glmer(religparty ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 globalism*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt,
+              family = binomial)
+
+model1c <- glmer(religparty ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 patriarchalvalues*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt,
+              family = binomial)
+
+model1d <- glmer(religparty ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 liberalislam*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt,
+              family = binomial)
+
+texreg::screenreg(list(model1a, model1b, model1c, model1d))
+```
+
+# brms
+
+```{r}
+fit1 <- brms::brm(islamism ~ 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 (1|cntry), data = arab_reg)
+```
+

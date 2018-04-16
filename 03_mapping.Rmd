@@ -1,0 +1,59 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# additional packages
+
+```{r}
+#devtools::install_github("dgrtwo/fuzzyjoin")
+
+
+pacman::p_load(tidyverse, ggthemes, rgdal, viridis, extrafont, magrittr, readxl, fuzzyjoin)
+myfont <- "Roboto Condensed"
+
+library(rgdal)
+library(maptools)
+if (!require(gpclib)) install.packages("gpclib", type="source")
+gpclibPermit()
+
+load("data/arab_reg.Rdata")
+``` 
+
+```{r}
+arab_reg %>% 
+    filter(cntry == "Egypt") %>% 
+  group_by(governorate) %>% 
+  summarise(islamism = mean(islamism, na.rm=T)) %>% 
+  mutate(id = as.character(governorate)) %>%
+  full_join(egypt_map_sh, by = "id", max_dist = 2) -> egypt_map
+
+
+sh <- rgdal::readOGR("data/egy_admbnda_adm1_capmas_20170421/egy_admbnda_adm1_capmas_20170421.shp")
+plot(sh)
+
+as.data.frame(sh)
+egypt_map_sh <- fortify(sh, region = "ADM1_REF")
+egypt_map_sh
+
+ggplot() +
+        geom_polygon(data = egypt_map_sh,aes(x = long, y = lat, group = group),
+                     fill = "grey90",color = "grey90") +
+          geom_polygon(data = egypt_map, 
+                     aes(x = long, y = lat, group = group, fill = islamism),
+                     color = NA) + viridis::scale_fill_viridis("Support in %", 
+                           option = "D", discrete = F, end = .8)
+
+agrep(arab_reg %>% 
+    filter(cntry == "Egypt") %>% .$governorate %>% unique() , 
+    unique(egypt_map_sh$id), max = 2, ignore.case = TRUE)
+```
+
+```{r}
+sh <- rgdal::readOGR("data/gadm28.shp")
+plot(sh)
+head(sh)
+
+world_map_sh <- fortify(sh, region = "ISO")
+```
+
