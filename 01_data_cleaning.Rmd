@@ -87,8 +87,8 @@ arab3 %<>%
 
   # Dependent Variable
 arab3 %<>% 
-  mutate(islamistparties1 = ifelse(q518a2 > 5, NA, 5 - q518a2)) %>%
-  mutate(islamistparties2 = ifelse(q518b2 > 5, NA, 5 - q518b2)) %>% 
+  mutate(islamistparties1 = ifelse(q518a2 >= 5, NA, 5 - q518a2)) %>%
+  mutate(islamistparties2 = ifelse(q518b2 >= 5, NA, 5 - q518b2)) %>% 
   mutate(islamistparties = case_when(
         islamistparties1 == 1 ~ 1,
         islamistparties1 == 2 ~ 2,
@@ -99,10 +99,10 @@ arab3 %<>%
         islamistparties2 == 3 ~ 3,
         islamistparties2 == 4 ~ 4)
     ) %>%  
-  mutate(islamistgov = ifelse(q5184 > 5, NA, 5 - q5184)) %>% 
+  mutate(islamistgov = ifelse(q5184 >= 5, NA, 5 - q5184)) %>% 
   mutate(religinterfere = ifelse(q6061 > 5, NA, q6061)) %>% 
-  mutate(religleaders = ifelse(q6062 > 5, NA, 5 - q6062)) %>% 
-  mutate(religleadersinfl = ifelse(q6063 > 5, NA, 5 - q6063)) %>%
+  mutate(religleaders = ifelse(q6062 >= 5, NA, 5 - q6062)) %>% 
+  mutate(religleadersinfl = ifelse(q6063 >= 5, NA, 5 - q6063)) %>%
   mutate(seperation = ifelse(q6064 > 5, NA, q6064)) %>% 
   mutate(religparty = Recode(q605a, "1 = 1;
                                      2 = 1;
@@ -129,7 +129,7 @@ arab3 %<>%
   mutate(female = ifelse(sex == 2, 1, 0)) %>% 
   mutate(work = ifelse(q1004 == 0 | q1004 > 5, NA, abs(q1004 - 2))) %>% 
   mutate(income = ifelse4cat_rec(q1016)) %>% 
-  mutate(age = ifelse(q1001 == 0 | q1001 == 9999, NA, q1001)) %>% 
+  mutate(age = ifelse(q1001 == 0 | q1001 == 9999 | q1001 == 999, NA, q1001)) %>% 
   mutate(educ = case_when(
         q1003 == 0 ~ NA_real_,
         q1003 == 99 ~ NA_real_,
@@ -186,11 +186,11 @@ arab4 %<>%
 
 # Dependent Variable
 arab4 %<>% 
-  mutate(islamistparties = ifelse(q5182 > 5, NA, 5 - q5182)) %>% 
-  mutate(islamistgov = ifelse(q5184 > 5, NA, 5 - q5184)) %>% 
+  mutate(islamistparties = ifelse(q5182 >= 5, NA, 5 - q5182)) %>% 
+  mutate(islamistgov = ifelse(q5184 >= 5, NA, 5 - q5184)) %>% 
   mutate(religinterfere = ifelse(q6061 > 5, NA, q6061)) %>% 
-  mutate(religleaders = ifelse(q6062 > 5, NA, 5 - q6062)) %>% 
-  mutate(religleadersinfl = ifelse(q6063 > 5, NA, 5 - q6063)) %>%
+  mutate(religleaders = ifelse(q6062 >= 5, NA, 5 - q6062)) %>% 
+  mutate(religleadersinfl = ifelse(q6063 >= 5, NA, 5 - q6063)) %>%
   mutate(seperation = ifelse(q6064 > 5, NA, q6064)) %>% 
   mutate(religparty = Recode(q605a, "1 = 1;
                                      2 = 1;
@@ -213,7 +213,7 @@ arab4 %<>%
   mutate(female = ifelse(q1002 == 2, 1, 0)) %>% 
   mutate(work = ifelse(q1004 == 0 | q1004 > 5, NA, abs(q1004 - 2))) %>% 
   mutate(income = ifelse4cat_rec(q1016)) %>% 
-  mutate(age = ifelse(q1001 == 0 | q1001 == 9999, NA, q1001)) %>% 
+  mutate(age = ifelse(q1001 == 0 | q1001 == 9999 | q1001 == 999, NA, q1001)) %>% 
   mutate(educ = case_when(
         q1003 == 0 ~ NA_real_,
         q1003 == 98 ~ NA_real_,
@@ -251,13 +251,16 @@ arab4 %<>%
 ```{r}
 arab3;arab4
 
-arab <- rbind(arab4,arab3)
+arab <- rbind(arab4,arab3) %>% 
+  filter(4 >= islamistgov |4 >= religleaders)
 
 arab
 
-table(arab$year)
+table(arab$age)
 table(arab$cntry)
 ```
+
+
 
 # Factor Analysis
 
@@ -272,11 +275,42 @@ table(arab$cntry)
 #         weight = na.omit(arab$wt)  )         
 # fa.diagram(f1)                                  
 # f1              
-
-f2 <- arab %>% 
+load("data/arab_reg.Rdata")
+library(tidyverse)
+arab_reg %>% 
   select(islamistparties, islamistgov, 
          religleaders, religleadersinfl) %>% 
-  psych::pca(weight = arab$wt) 
+  psych::pca(weight = arab_reg$wt, rotate = "oblimin") -> f2
+
+data.frame(loadings = f2$loadings[1:4]) %>% 
+  mutate(loadings = round(loadings, 2)) %>% 
+  mutate(variable = c("Only Islamist Parties",
+                      "Islamist Government (no elections)",
+                      "Religious Leaders hold office",
+                      "Religious Leaders influence decisions")) %>% 
+  ggplot(aes(variable, y = 1, fill = loadings)) +
+    geom_tile() +
+  coord_flip() +
+  ggthemes::theme_hc() +
+  scale_fill_continuous(low = "lightblue", high = "blue") +
+   geom_text(aes(variable, y = 1, label = loadings), color = "black", size = 4)  +
+   geom_text(aes(4.3, y = 1.35, 
+                 label = "Cronbach~~alpha==0.70"), 
+             color = "black", size = 5, parse = T)   +
+   geom_text(aes(3.7, y = 1.35, 
+                 label = "KMO = 0.68"), 
+             color = "black", size = 5)    +
+   geom_text(aes(0.6, y = 1.35, 
+                 label = "Variance explained = 53%"), 
+             color = "black", size = 5) +
+  xlab("") +
+  ylab("") +
+  guides(fill = F) +
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
+
+ggsave(filename = "images/factor.png", width = 8, height = 4)
+  
+  
 
 arab %>% 
   select(islamistparties, islamistgov, 
@@ -320,6 +354,9 @@ arab <- predict.psych(f2, arab %>%
 # 
 # cor.test(arab$PC1, arab$PA1)
 
+save(arab, file = "data/arab.Rdata")
+load("data/arab.Rdata") 
+nrow(arab)
 ```
 
 # Creating indices
@@ -373,8 +410,8 @@ arab_reg <- arab %>%
   mutate(patriarchalvalues = range01(womanwork + womenleader + womeneduc))  %>% 
   mutate(personalpiety = range01(pray + quran)) %>% 
   mutate(antiwestern = range01(inf_eu + inf_us)) %>% 
-  mutate(islamism = range01(islamism) * 100) %>% 
-  mutate_at(vars(islamistparties:inf_eu), range01) %>% 
+  mutate(islamism = range01(islamism)) %>% 
+  mutate_at(vars(female:inf_eu), range01) %>% 
 #  mutate(islamism = scale(islamism)) %>% 
 #  mutate(islamism = scale(islamism)) %>% 
 #  mutate_if(.predicate = is.double, scale) 
@@ -383,7 +420,16 @@ arab_reg <- arab %>%
   mutate(year_2016 = ifelse(year == 2016, 1, 0)) %>% 
   mutate(year_2014 = ifelse(year == 2014, 1, 0)) %>% 
   mutate(year_2013 = ifelse(year == 2013, 1, 0)) %>% 
-  mutate(year_2012 = ifelse(year == 2012, 1, 0)) 
+  mutate(year_2012 = ifelse(year == 2012, 1, 0)) %>% 
+  select(cntry, islamism, female, work, income, age, educ, 
+                 year_2012, year_2013, year_2014, 
+         islamistparties:islamistgov,
+         religleaders:religleadersinfl,
+                 globalism, personalpiety, patriarchalvalues, liberalislam,
+                 wt)  %>% 
+  filter(4 >= islamistgov) %>%
+  filter(4 >= religleaders)%>% 
+  na.omit()
 
 # arab_reg$islamism_fa <- as.numeric(range01(arab_reg$islamism_fa) * 100)
 # arab_reg$islamism_pca <- as.numeric(range01(arab_reg$islamism_pca) * 100)
@@ -409,6 +455,8 @@ arab_reg <- arab %>%
 table(arab$year, arab$cntry)
 
 save(arab_reg, file = "data/arab_reg.Rdata")
+
+table(arab_reg$cntry)
 ```
 
 

@@ -10,13 +10,18 @@ pacman::p_load(tidyverse, haven, magrittr, car, psych, sjPlot, sjstats, sjmisc, 
 
 load("data/arab_reg.Rdata")
 
-table(arab_reg$cntry, arab_reg$governorate)
+# arab_reg %<>% 
+#   mutate(islamism = range01(islamism)) %>% 
+#   mutate(age = ifelse(age == 1, NA, age)) %>% 
+#   mutate(age = range01(age))
 
-arab_reg %>% 
-  filter(cntry == "Egypt") %>% 
-  select(governorate) %>% 
-  unique() %>% 
-  arrange(governorate)
+# table(arab_reg$cntry, arab_reg$governorate)
+
+# arab_reg %>% 
+#   filter(cntry == "Egypt") %>% 
+#   select(governorate) %>% 
+#   unique() %>% 
+#   arrange(governorate)
 
 ```
 
@@ -29,20 +34,21 @@ model0 <- arab_reg %>%
 
 icc(model0)
 
-model1 <- lmer(islamism ~ female + work + income + age + educ + 
+model1 <- lmer(islamism ~ female + age + #work + income + educ + 
                  year_2012 + year_2013 + year_2014 + 
                 # globalism + personalpiety + patriarchalvalues + liberalislam + 
                  (1|cntry), data = arab_reg, weights = wt)
 
-model2 <- lmer(islamism ~ female + work + income + age + educ + 
+model2 <- lmer(islamism ~ female + age + work + income + educ + 
                  year_2012 + year_2013 + year_2014 + 
-                 globalism + #personalpiety + patriarchalvalues + liberalislam + 
+                # globalism + personalpiety + patriarchalvalues + liberalislam + 
                  (1|cntry), data = arab_reg, weights = wt)
 
 model3 <- lmer(islamism ~ female + work + income + age + educ + 
                  year_2012 + year_2013 + year_2014 + 
                  globalism + #personalpiety + patriarchalvalues + liberalislam + 
                  (1|cntry), data = arab_reg, weights = wt)
+
 
 model4 <- lmer(islamism ~ female + work + income + age + educ + 
                  year_2012 + year_2013 + year_2014 + 
@@ -67,26 +73,154 @@ texreg::screenreg(list(model1, model2, model3, model4, model5, model6))
 # Interactions
 
 ```{r}
-model7 <- lmer(islamism ~ female + work + income + age + educ + 
+
+# model7 <- lmer(islamism ~ female + work + income + age + educ + 
+#                  year_2012 + year_2013 + year_2014 + 
+#                  globalism + personalpiety + patriarchalvalues + liberalislam +
+#                  personalpiety*work +
+#                  (1|cntry), data = arab_reg, weights = wt)
+
+# model8 <- lmer(islamism ~ female + work + income + age + educ + 
+#                  year_2012 + year_2013 + year_2014 + 
+#                  globalism + personalpiety + patriarchalvalues + liberalislam +
+#                  personalpiety*income +
+#                  (1|cntry), data = arab_reg, weights = wt)
+# 
+# model9 <- lmer(islamism ~ female + work + income + age + educ + 
+#                  year_2012 + year_2013 + year_2014 + 
+#                  globalism + personalpiety + patriarchalvalues + liberalislam +
+#                  personalpiety*educ +
+#                  (1|cntry), data = arab_reg, weights = wt)
+# 
+# model10 <- lmer(islamism ~ female + work + income + age + educ + 
+#                  year_2012 + year_2013 + year_2014 + 
+#                  globalism + personalpiety + patriarchalvalues + liberalislam +
+#                  personalpiety*globalism +
+#                  (1|cntry), data = arab_reg, weights = wt)
+
+
+model11 <- lmer(islamism ~ female + work + income + age + educ + 
                  year_2012 + year_2013 + year_2014 + 
                  globalism + personalpiety + patriarchalvalues + liberalislam +
-                 globalism*personalpiety +
+                 personalpiety*patriarchalvalues +
                  (1|cntry), data = arab_reg, weights = wt)
 
-model8 <- lmer(islamism ~ female + work + income + age + educ + 
+model12 <- lmer(islamism ~ female + work + income + age + educ + 
                  year_2012 + year_2013 + year_2014 + 
                  globalism + personalpiety + patriarchalvalues + liberalislam +
-                 patriarchalvalues*personalpiety +
+                 personalpiety*liberalislam +
                  (1|cntry), data = arab_reg, weights = wt)
 
-model9 <- lmer(islamism ~ female + work + income + age + educ + 
-                 year_2012 + year_2013 + year_2014 + 
-                 globalism + personalpiety + patriarchalvalues + liberalislam +
-                 liberalislam*personalpiety +
-                 (1|cntry), data = arab_reg, weights = wt)
+#texreg::screenreg(list(model6, model7, model8, model9))
 
-texreg::screenreg(list(model6, model7, model8, model9))
+# arab_reg %>% 
+#   drop_na(islamism) -> aa
+
+# 18508/21915
+# 1-0.8445357
+
+anova(model6, model12)
 ```
+
+
+
+```{r}
+texreg::texreg(list(model1, model2, model3, 
+                    model4, model5, model6, 
+                    model11, model12),
+          label = "regressions",
+          #caption = "Bolded coefficients, custom notes, three digits.",
+          float.pos = "!h", bold = 0.10,
+       #   custom.note = "Coefficients with $p < 0.05$ in \\textbf{bold}.",
+          digits = 2, leading.zero = FALSE, 
+       stars = c(0.001, 0.01, 0.05, 0.1),
+          symbol = "\\dagger", #reorder.coef = c(1:6, 8:12, 13:17, 7, 18:22),
+          groups = list("\\textbf{Control Variables}" = 2:6,
+                        "\\textbf{Variables of Interest}" = 7:13,
+                        "\\textbf{Interactions}" = 14:15), 
+       reorder.coef = c(1:10, 12, 11, 13:15),
+          custom.coef.names =  c("Intercept",
+                                 "Sex (Male/Female)",
+                                 "Age",
+                                 "Year 2012 (0/1)",
+                                 "Year 2013 (0/1)",
+                                 "Year 2014 (0/1)",
+                                 "Employment (0/1)",
+                                 "Financial Security",
+                                 "Education",
+                                 "Parochialism",
+                                 "Personal Piety",
+                                 "Patriarchal Values",
+                                 "Liberal Islam",
+                                 "Personal Piety $\\times$ Patriarchal Values",
+                                 "Personal Piety $\\times$ Liberal Islam"), custom.note = "Models show unstandardized b-coefficients. All variables normalized (0-1). Reference category for year dummies is 2016. Data weighted to nationally representative samples."
+       )
+```
+
+```{r}
+plot_model(model6, show.values = T, 
+           show.p = T, sort.est = T, 
+           value.offset = 0.4, 
+           vline.color = "gray90", axis.labels = c("Liberal Islam",
+                                                   "Age",
+                                                   "Education",
+                                                   "Year 2014 (0/1)",
+                                                   "Employment (0/1)",
+                                                   "Year 2012 (0/1)",
+                                                   "Financial Security",
+                                                   "Sex (Male/Female)",
+                                                   "Year 2013 (0/1)", 
+                                                   "Parochialism",
+                                                   "Personal Piety",
+                                                   "Patriarchal Values")) +
+  ggthemes::theme_hc() +
+  ggtitle("")
+
+ggsave(filename = "text/images/coefplot.png", width = 12, height = 7)
+
+plot_model(model11 ,type = "int", axis.lim = c(.1,0.6), grid.breaks = .1) +
+  ggthemes::theme_hc() +
+  ggtitle("") +
+  ylab("Support for Islamism") +
+  xlab("Personal Piety") +
+  scale_color_discrete("Patriarchal Values") -> relig_pat
+plot_model(model12 ,type = "int", axis.lim = c(.1,0.6)) +
+  ggthemes::theme_hc() +
+  ggtitle("") +
+  ylab("Support for Islamism")  +
+  xlab("Personal Piety") +
+  scale_color_discrete("Liberal Islam") -> relig_lib
+
+cowplot::plot_grid(relig_pat, relig_lib)
+
+ggsave(filename = "text/images/interactions.png", width = 12, height = 5)
+```
+
+# vifs
+
+```{r}
+vif.mer <- function (fit) {
+  ## adapted from rms::vif
+  
+  v <- vcov(fit)
+  nam <- names(fixef(fit))
+  
+  ## exclude intercepts
+  ns <- sum(1 * (nam == "Intercept" | nam == "(Intercept)"))
+  if (ns > 0) {
+    v <- v[-(1:ns), -(1:ns), drop = FALSE]
+    nam <- nam[-(1:ns)]
+  }
+  
+  d <- diag(v)^0.5
+  v <- diag(solve(v/(d %o% d)))
+  names(v) <- nam
+  v
+}
+
+vif.mer(model12)
+```
+
 
 # GLMER
 
