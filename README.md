@@ -1,15 +1,6 @@
-# GodlyGovernance
+# Godly Governance
 
-**Possible Publications for Paper**
-
-[Center for International and Regional Studies - Georgetown University in Qatar](https://cirs.georgetown.edu/publications/submission-guidelines)
-
-[4th China and The Middle East Conference - China and West Asia: Economic Development; and Social and Political Cooperation](https://www.ipsa.org/news/call-for-paper/4th-china-and-middle-east-conference-china-and-west-asia-economic-development)
-
-Please submit your proposal to Dr. Tugrul Keskin (tugrulkeskin@t.shu.edu.cn) by **APRIL 16, 2018**. We acknowledge receipt of all emails and will reply to all. If you do not receive a reply, please resend your abstract.
+**Author: Fabio Votta**
 
 
-http://www.asmeascholars.org/conference/save-the-date-eleventh-annual-asmea-conference/
-
-
-[European Journal for Political Research](https://mc.manuscriptcentral.com/ejpr)
+This paper seeks to investigate Muslim support for religious governance in Arab Muslim-Majority countries, focusing on the role of personal piety. It does so by exploring the relevant literature and deriving hypotheses from it, which are subsequently tested by using survey data of the Arab Barometer (Wave III and IV). The following analysis conducts hierarchical linear regression with the dependent variable ideological support for religious governance (Islamism). The analysis finds that religiosity indeed plays a major role in explaining support for religious governance, however this effect depends substantially on an individual’s interpretation of their religion as well as the tendency to endorse patriarchal values. The findings of the analysis suggest that further studies in the field should account for the multidimensional impact of religiosity and avoid essentialist explanations that inextricably link Muslim religiosity to support for religious governance.
