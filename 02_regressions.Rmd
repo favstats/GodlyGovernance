@@ -194,6 +194,40 @@ plot_model(model12 ,type = "int", axis.lim = c(.1,0.6)) +
 cowplot::plot_grid(relig_pat, relig_lib)
 
 ggsave(filename = "text/images/interactions.png", width = 12, height = 5)
+
+
+
+model13 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 patriarchalvalues*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt)
+
+model14 <- lmer(islamism ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam +
+                 liberalislam*personalpiety +
+                 (1|cntry), data = arab_reg, weights = wt)
+
+
+
+plot_model(model13 ,type = "int", axis.lim = c(.1,0.6), grid.breaks = .1) +
+  ggthemes::theme_hc() +
+  ggtitle("") +
+  ylab("Support for Islamism") +
+  xlab("Patriarchal Values") +
+  scale_color_discrete("Personal Piety") -> relig_pat2
+plot_model(model14 ,type = "int", axis.lim = c(.1,0.6)) +
+  ggthemes::theme_hc() +
+  ggtitle("") +
+  ylab("Support for Islamism")  +
+  xlab("Liberal Islam") +
+  scale_color_discrete("Personal Piety") -> relig_lib2
+
+cowplot::plot_grid(relig_pat2, relig_lib2)
+
+ggsave(filename = "text/images/interactions2.png", width = 12, height = 5)
+
 ```
 
 # vifs
@@ -258,8 +292,83 @@ texreg::screenreg(list(model1a, model1b, model1c, model1d))
 # brms
 
 ```{r}
-fit1 <- brms::brm(islamism ~ 
-                 globalism + personalpiety + patriarchalvalues + liberalislam +
+library(brms)
+
+bm1 <- brms::brm(islamism|weights(wt) ~ female + work + income + age + educ + 
+                 year_2012 + year_2013 + year_2014 + 
+                 globalism + personalpiety + patriarchalvalues + liberalislam + 
                  (1|cntry), data = arab_reg)
+
+# devtools::install_github("systats/lolR")
+
+save(bm1, file = "data/bm1.Rdata")
+
+
+load("data/bm1.Rdata")
+
+plot(marginal_effects(bm1))
+
+library(tidybayes)
+
+add_predicted_samples(arab_reg %>% sample_n(20), bm1) -> pred_samples
+add_fitted_samples(arab_reg, bm1, n = 100) -> fit_samples
+
+library(ggridges)
+
+pred_samples %>%
+  ggplot(aes(x = pred, y = personalpiety)) +
+  geom_density_ridges()
+
+
+library(modelr)
+
+m_mpg <- brms::brm(mpg ~ hp, data = mtcars)
+
+mtcars %>% 
+  modelr::data_grid(hp = modelr::seq_range(hp, 101), am) %>% 
+  add_predicted_samples(m_mpg)
+
+
+fit_samples %>%
+  ungroup() %>% 
+  select(liberalislam, personalpiety, patriarchalvalues, estimate, .iteration) %>% 
+  gather("variable", "value", -estimate, -.iteration) %>% 
+  # mutate(variable = 
+  #          case_when(
+  #            variable == "govsat" ~ "Government Satisfaction",
+  #            variable == "globalism" ~ "Trust in Global Governance",
+  #            variable == "lrscale" ~ "Left-Right Scale"
+  #          )) %>% 
+  # mutate(category = 
+  #          case_when(
+  #            category == "1" ~ "Establishment",
+  #            category == "2" ~ "Progressive Populism",
+  #            category == "3" ~ "Traditionalist Populism"
+  #          )) %>% 
+  mutate(estimate = round(estimate * 100, 2)) %>% 
+ ggplot(aes(x = value, y = estimate)) +
+  geom_smooth(aes(y = estimate, group = .iteration), alpha = 0.25, 
+              se = F, size = 0.000000000000025, method = "lm") +
+  facet_grid(~variable, scales = "free") +
+    scale_y_continuous(breaks = seq(0,100, by = 5),
+                     labels = paste0(seq(0,100, by = 5),"%")) + 
+    ggthemes::theme_hc() +
+    labs(y = "Probability", x = "Score") +
+  ggthemes::scale_colour_gdocs("Type") + 
+    guides(color = F) +
+  # cowplot::panel_border() +# and a border around each panel
+  theme(panel.spacing = unit(2, "lines"),
+        strip.text = element_text(size = 11)) 
+    # scale_x_continuous(breaks = seq(0,10, by
+
+ggsave(filename = "slides/images/bayesia_fun2.png", width = 12, height = 9)
+
+
+pred_samples %>% 
+  ggplot(aes(personalpiety)) +
+  geom_jitter(aes(personalpiety, pred), alpha = 0.1) + 
+  stat_lineribbon(aes(y = pred), .prob = c(.99, .95, .8, .5), alpha = 0.5) +
+  scale_fill_brewer() 
+
 ```
 
